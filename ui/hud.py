@@ -1,4 +1,4 @@
-"""顶部工具栏：关卡编号 + Reset / Previous / Next 按钮布局与绘制。"""
+"""Top control bar: level info and Reset / Previous / Next buttons."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from .button import Button
 
 
 class ControlBar:
-    """在标题下方一行内绘制关卡文字与三个按钮，并提供点击命中查询。"""
+    """Draws level info and buttons in a row below the title."""
 
     def __init__(self, screen_width: int, font: pygame.font.Font) -> None:
         self._screen_width = screen_width
@@ -50,7 +50,7 @@ class ControlBar:
         level_index: int,
         level_total: int,
     ) -> None:
-        label = f"关卡 {level_index + 1}/{level_total}"
+        label = f"Level {level_index + 1}/{level_total}"
         surf = self._font.render(label, True, C.COLOR_TITLE)
         y_text = C.TITLE_BAR_HEIGHT + (C.CONTROL_BAR_HEIGHT - surf.get_height()) // 2
         surface.blit(surf, (16, y_text))

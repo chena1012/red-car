@@ -1,21 +1,21 @@
-"""全局常量：窗口、棋盘、出口、颜色、帧率、顶部工具栏。"""
+"""Global constants: Window, Board, Exit, Colors, FPS, UI dimensions."""
 
-# --- 棋盘 ---
-CELL_SIZE = 90  # 每格边长（像素）
+# --- Board ---
+CELL_SIZE = 90  # Cell size in pixels
 GRID_ROWS = 6
 GRID_COLS = 6
 
-# 经典 Rush Hour：出口在棋盘右侧、中间一行（0 起始为第 3 行）
+# Classic Rush Hour: Exit on the right side of the board, middle row (index 2)
 EXIT_ROW = 2
 
-# 棋盘右侧留出一条“出口通道”用于绘制
+# Exit portal width on the right
 EXIT_PORTAL_WIDTH = 56
 
-# --- 窗口布局 ---
+# --- Window Layout ---
 BOARD_MARGIN = 24
 BOTTOM_MARGIN = 24
 
-# 标题条 + 下方一排控制按钮
+# Title bar + control buttons height
 TITLE_BAR_HEIGHT = 50
 CONTROL_BAR_HEIGHT = 46
 TOP_SECTION_HEIGHT = TITLE_BAR_HEIGHT + CONTROL_BAR_HEIGHT
@@ -28,7 +28,7 @@ WINDOW_HEIGHT = TOP_SECTION_HEIGHT + BOARD_PIXEL_H + BOTTOM_MARGIN
 
 FPS = 60
 
-# --- 颜色 (R, G, B) ---
+# --- Colors (R, G, B) ---
 COLOR_BG = (40, 44, 52)
 COLOR_BOARD = (67, 76, 94)
 COLOR_GRID_LINE = (216, 222, 233)
@@ -43,7 +43,7 @@ COLOR_WIN_OVERLAY = (15, 18, 24, 200)
 COLOR_WIN_TEXT = (241, 245, 249)
 COLOR_WIN_PANEL = (51, 65, 85)
 
-# 按钮（与工具栏统一风格）
+# Buttons
 BUTTON_HEIGHT = 34
 BUTTON_PAD_X = 14
 BUTTON_RADIUS = 6
@@ -52,5 +52,5 @@ COLOR_BUTTON_FILL_HOVER = (71, 85, 105)
 COLOR_BUTTON_BORDER = (148, 163, 184)
 COLOR_BUTTON_TEXT = (241, 245, 249)
 
-# 车辆绘制：相对格子的内边距（像素）
+# Vehicle inset from cell boundary
 VEHICLE_INSET = 6

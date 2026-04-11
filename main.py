@@ -1,4 +1,4 @@
-"""程序入口：启动游戏窗口与主循环。"""
+"""Entry point: starts the game window and main loop."""
 
 from game.game import Game
 

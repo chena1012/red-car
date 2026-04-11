@@ -1,4 +1,4 @@
-"""游戏主类：主循环、关卡索引、输入事件、绘制与胜利提示。"""
+"""Main game class: loop, level index, input events, drawing and victory prompts."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import sys
 import pygame
 
 from ui.hud import ControlBar
+from ui.panels import Menu
 
 from . import constants as C
 from .board import Board
@@ -32,44 +33,56 @@ class Game:
 
         self._selected_id: str | None = None
         self._steps = 0
+        self._elapsed_ms = 0
         self._won = False
+        self._state_name = "MENU"  # "MENU" or "PLAYING"
 
         try:
             self._font_title = pygame.font.SysFont("segoeui", 28, bold=True)
             self._font_ui = pygame.font.SysFont("segoeui", 18)
             self._font_btn = pygame.font.SysFont("segoeui", 17)
             self._font_win = pygame.font.SysFont("segoeui", 48, bold=True)
+            self._font_menu_title = pygame.font.SysFont("segoeui", 56, bold=True)
+            self._font_menu_btn = pygame.font.SysFont("segoeui", 24)
         except OSError:
             self._font_title = pygame.font.Font(None, 32)
             self._font_ui = pygame.font.Font(None, 20)
             self._font_btn = pygame.font.Font(None, 19)
             self._font_win = pygame.font.Font(None, 52)
+            self._font_menu_title = pygame.font.Font(None, 64)
+            self._font_menu_btn = pygame.font.Font(None, 32)
 
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
+        self._menu = Menu(C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn)
 
     def run(self) -> None:
         running = True
         while running:
+            dt = self._clock.tick(C.FPS)
+            if self._state_name == "PLAYING" and not self._won:
+                self._elapsed_ms += dt
+
             running = self._handle_events()
             self._draw()
             pygame.display.flip()
-            self._clock.tick(C.FPS)
         pygame.quit()
         sys.exit(0)
 
     def _load_level(self, index: int) -> None:
-        """切换到指定关卡并清空本关步数、胜利与选中状态。"""
+        """Switch to a level and reset steps, victory status and selection."""
         n = level_count()
         self._level_index = index % n
         self._state = load_game_state(self._level_index)
         self._steps = 0
+        self._elapsed_ms = 0
         self._won = False
         self._selected_id = None
 
     def _reset_current_level(self) -> None:
-        """恢复当前关初始布局（步数归零，可继续玩）。"""
+        """Reset the current level layout."""
         self._state = load_game_state(self._level_index)
         self._steps = 0
+        self._elapsed_ms = 0
         self._won = False
         self._selected_id = None
 
@@ -84,9 +97,21 @@ class Game:
             if event.type == pygame.QUIT:
                 return False
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                self._on_mouse_down(event.pos)
+                if self._state_name == "MENU":
+                    action = self._menu.action_at(event.pos)
+                    if action == "start":
+                        self._state_name = "PLAYING"
+                        self._reset_current_level()
+                    elif action == "exit":
+                        return False
+                else:
+                    self._on_mouse_down(event.pos)
             elif event.type == pygame.KEYDOWN:
-                self._on_key_down(event.key)
+                if self._state_name == "PLAYING":
+                    self._on_key_down(event.key)
+                elif self._state_name == "MENU" and event.key == pygame.K_RETURN:
+                    self._state_name = "PLAYING"
+                    self._reset_current_level()
         return True
 
     def _on_mouse_down(self, pos: tuple[int, int]) -> None:
@@ -157,7 +182,21 @@ class Game:
         self._screen.blit(text_surf, text_rect)
 
     def _draw_hud(self) -> None:
-        steps_surf = self._font_ui.render(f"步数: {self._steps}", True, C.COLOR_TITLE)
+        # Format time
+        total_seconds = self._elapsed_ms // 1000
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        time_str = f"time: {minutes:02d}:{seconds:02d}"
+        
+        # Draw time (left)
+        time_surf = self._font_ui.render(time_str, True, C.COLOR_TITLE)
+        time_rect = time_surf.get_rect(
+            bottomleft=(16, C.WINDOW_HEIGHT - 12)
+        )
+        self._screen.blit(time_surf, time_rect)
+
+        # Draw steps (right)
+        steps_surf = self._font_ui.render(f"step: {self._steps}", True, C.COLOR_TITLE)
         steps_rect = steps_surf.get_rect(
             bottomright=(C.WINDOW_WIDTH - 16, C.WINDOW_HEIGHT - 12)
         )
@@ -217,12 +256,19 @@ class Game:
                 )
 
     def _draw_win_overlay(self) -> None:
-        """半透明层只盖住棋盘与底部 HUD，保留顶部标题与按钮可点（便于胜利后点 Next）。"""
+        """Translucent layer covering board and HUD, keeping title and buttons clickable."""
         w, h = self._screen.get_size()
         y0 = C.TOP_SECTION_HEIGHT
         overlay = pygame.Surface((w, h - y0), pygame.SRCALPHA)
         overlay.fill(C.COLOR_WIN_OVERLAY)
         self._screen.blit(overlay, (0, y0))
+
+        # Prepare stats text
+        total_seconds = self._elapsed_ms // 1000
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        stats_str = f"step: {self._steps} time: {minutes:02d}:{seconds:02d}"
+        stats_surf = self._font_ui.render(stats_str, True, C.COLOR_WIN_TEXT)
 
         last = self._level_index == level_count() - 1
         line1 = self._font_win.render("You Win!", True, C.COLOR_WIN_TEXT)
@@ -230,12 +276,12 @@ class Game:
             line2 = self._font_ui.render(
                 "All levels completed!", True, C.COLOR_WIN_TEXT
             )
-            panel_w = max(line1.get_width(), line2.get_width()) + 80
-            panel_h = line1.get_height() + line2.get_height() + 56
+            panel_w = max(line1.get_width(), line2.get_width(), stats_surf.get_width()) + 80
+            panel_h = line1.get_height() + stats_surf.get_height() + line2.get_height() + 72
         else:
             line2 = None
-            panel_w = line1.get_width() + 80
-            panel_h = line1.get_height() + 48
+            panel_w = max(line1.get_width(), stats_surf.get_width()) + 80
+            panel_h = line1.get_height() + stats_surf.get_height() + 64
 
         panel = pygame.Rect(0, 0, panel_w, panel_h)
         panel.center = (C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT // 2)
@@ -247,13 +293,22 @@ class Game:
         y = panel.top + 24
         r1 = line1.get_rect(centerx=panel.centerx, top=y)
         self._screen.blit(line1, r1)
+
+        r_stats = stats_surf.get_rect(centerx=panel.centerx, top=r1.bottom + 12)
+        self._screen.blit(stats_surf, r_stats)
+
         if line2 is not None:
             r2 = line2.get_rect(
-                centerx=panel.centerx, top=r1.bottom + 12,
+                centerx=panel.centerx, top=r_stats.bottom + 12,
             )
             self._screen.blit(line2, r2)
 
     def _draw(self) -> None:
+        if self._state_name == "MENU":
+            mouse = pygame.mouse.get_pos()
+            self._menu.draw(self._screen, mouse)
+            return
+
         self._screen.fill(C.COLOR_BG)
         self._draw_title()
         mouse = pygame.mouse.get_pos()

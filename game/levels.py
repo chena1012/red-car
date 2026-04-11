@@ -1,113 +1,53 @@
-"""关卡数据：硬编码多关车辆的初始参数（不从文件读取）。"""
+"""Level data: hardcoded initial parameters for vehicles in each level."""
 
 from __future__ import annotations
 
 from .state import GameState
 from .vehicle import Vehicle
 
-# 每关：字典列表，键与 Vehicle.__init__ 一致，可直接 Vehicle(**d)
+# Each level: list of dictionaries, keys match Vehicle.__init__
 _LEVEL_SPECS: list[list[dict]] = [
-    # 关卡 0：仅红车，用于演示布局与出口
+    # Level 1
     [
-        {
-            "id": "red",
-            "row": 2,
-            "col": 0,
-            "length": 2,
-            "horizontal": True,
-            "color": (220, 38, 38),
-            "is_target": True,
-        },
+        {"id": "R", "row": 2, "col": 1, "length": 2, "horizontal": True, "color": (220, 50, 47), "is_target": True},
+        {"id": "A", "row": 0, "col": 0, "length": 2, "horizontal": False, "color": (38, 139, 210), "is_target": False},
+        {"id": "B", "row": 0, "col": 3, "length": 3, "horizontal": False, "color": (133, 153, 0), "is_target": False},
+        {"id": "C", "row": 1, "col": 4, "length": 2, "horizontal": True, "color": (181, 137, 0), "is_target": False},
+        {"id": "D", "row": 3, "col": 0, "length": 3, "horizontal": False, "color": (108, 113, 196), "is_target": False},
+        {"id": "E", "row": 4, "col": 2, "length": 2, "horizontal": True, "color": (42, 161, 152), "is_target": False},
+        {"id": "F", "row": 3, "col": 5, "length": 3, "horizontal": False, "color": (203, 75, 22), "is_target": False},
     ],
-    # 关卡 1：红车 + 一辆竖车挡路
+    # Level 2
     [
-        {
-            "id": "red",
-            "row": 2,
-            "col": 0,
-            "length": 2,
-            "horizontal": True,
-            "color": (220, 38, 38),
-            "is_target": True,
-        },
-        {
-            "id": "v1",
-            "row": 0,
-            "col": 3,
-            "length": 2,
-            "horizontal": False,
-            "color": (59, 130, 246),
-            "is_target": False,
-        },
+        {"id": "R", "row": 2, "col": 0, "length": 2, "horizontal": True, "color": (220, 50, 47), "is_target": True},
+        {"id": "A", "row": 0, "col": 0, "length": 2, "horizontal": False, "color": (38, 139, 210), "is_target": False},
+        {"id": "B", "row": 0, "col": 2, "length": 3, "horizontal": False, "color": (133, 153, 0), "is_target": False},
+        {"id": "C", "row": 0, "col": 4, "length": 3, "horizontal": False, "color": (181, 137, 0), "is_target": False},
+        {"id": "D", "row": 3, "col": 1, "length": 2, "horizontal": True, "color": (108, 113, 196), "is_target": False},
+        {"id": "E", "row": 4, "col": 3, "length": 2, "horizontal": True, "color": (42, 161, 152), "is_target": False},
+        {"id": "F", "row": 3, "col": 5, "length": 3, "horizontal": False, "color": (203, 75, 22), "is_target": False},
     ],
-    # 关卡 2：多一辆横向车，稍挤
+    # Level 3
     [
-        {
-            "id": "red",
-            "row": 2,
-            "col": 0,
-            "length": 2,
-            "horizontal": True,
-            "color": (220, 38, 38),
-            "is_target": True,
-        },
-        {
-            "id": "v1",
-            "row": 0,
-            "col": 2,
-            "length": 2,
-            "horizontal": False,
-            "color": (59, 130, 246),
-            "is_target": False,
-        },
-        {
-            "id": "h1",
-            "row": 4,
-            "col": 1,
-            "length": 2,
-            "horizontal": True,
-            "color": (34, 197, 94),
-            "is_target": False,
-        },
+        {"id": "R", "row": 2, "col": 1, "length": 2, "horizontal": True, "color": (220, 50, 47), "is_target": True},
+        {"id": "A", "row": 0, "col": 0, "length": 3, "horizontal": False, "color": (38, 139, 210), "is_target": False},
+        {"id": "B", "row": 0, "col": 2, "length": 2, "horizontal": True, "color": (133, 153, 0), "is_target": False},
+        {"id": "C", "row": 0, "col": 4, "length": 3, "horizontal": False, "color": (181, 137, 0), "is_target": False},
+        {"id": "D", "row": 1, "col": 3, "length": 2, "horizontal": False, "color": (108, 113, 196), "is_target": False},
+        {"id": "E", "row": 3, "col": 0, "length": 2, "horizontal": True, "color": (42, 161, 152), "is_target": False},
+        {"id": "F", "row": 4, "col": 1, "length": 2, "horizontal": True, "color": (203, 75, 22), "is_target": False},
+        {"id": "G", "row": 3, "col": 5, "length": 3, "horizontal": False, "color": (147, 161, 161), "is_target": False},
     ],
-    # 关卡 3：更长车辆 + 更多阻挡
+    # Level 4
     [
-        {
-            "id": "red",
-            "row": 2,
-            "col": 1,
-            "length": 2,
-            "horizontal": True,
-            "color": (220, 38, 38),
-            "is_target": True,
-        },
-        {
-            "id": "v_long",
-            "row": 0,
-            "col": 0,
-            "length": 3,
-            "horizontal": False,
-            "color": (99, 102, 241),
-            "is_target": False,
-        },
-        {
-            "id": "h1",
-            "row": 3,
-            "col": 3,
-            "length": 2,
-            "horizontal": True,
-            "color": (34, 197, 94),
-            "is_target": False,
-        },
-        {
-            "id": "v2",
-            "row": 4,
-            "col": 5,
-            "length": 2,
-            "horizontal": False,
-            "color": (244, 114, 182),
-            "is_target": False,
-        },
+        {"id": "R", "row": 2, "col": 0, "length": 2, "horizontal": True, "color": (220, 50, 47), "is_target": True},
+        {"id": "A", "row": 0, "col": 0, "length": 2, "horizontal": False, "color": (38, 139, 210), "is_target": False},
+        {"id": "B", "row": 0, "col": 2, "length": 3, "horizontal": False, "color": (133, 153, 0), "is_target": False},
+        {"id": "C", "row": 0, "col": 3, "length": 2, "horizontal": True, "color": (181, 137, 0), "is_target": False},
+        {"id": "D", "row": 1, "col": 4, "length": 3, "horizontal": False, "color": (108, 113, 196), "is_target": False},
+        {"id": "E", "row": 3, "col": 2, "length": 2, "horizontal": True, "color": (42, 161, 152), "is_target": False},
+        {"id": "F", "row": 4, "col": 0, "length": 2, "horizontal": True, "color": (203, 75, 22), "is_target": False},
+        {"id": "G", "row": 3, "col": 5, "length": 3, "horizontal": False, "color": (147, 161, 161), "is_target": False},
     ],
 ]
 

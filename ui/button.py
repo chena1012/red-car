@@ -1,4 +1,4 @@
-"""简单矩形按钮：Pygame 绘制与点击区域检测。"""
+"""Simple rectangular button: Pygame drawing and hit detection."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from game import constants as C
 
 
 class Button:
-    """统一圆角矩形 + 居中文字；可选根据鼠标位置显示悬停底色。"""
+    """Rounded rectangle button with centered text and hover effect."""
 
     def __init__(
         self,
