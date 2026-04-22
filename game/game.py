@@ -37,20 +37,15 @@ class Game:
         self._won = False
         self._state_name = "MENU"  # "MENU" or "PLAYING"
 
-        try:
-            self._font_title = pygame.font.SysFont("segoeui", 28, bold=True)
-            self._font_ui = pygame.font.SysFont("segoeui", 18)
-            self._font_btn = pygame.font.SysFont("segoeui", 17)
-            self._font_win = pygame.font.SysFont("segoeui", 48, bold=True)
-            self._font_menu_title = pygame.font.SysFont("segoeui", 56, bold=True)
-            self._font_menu_btn = pygame.font.SysFont("segoeui", 24)
-        except OSError:
-            self._font_title = pygame.font.Font(None, 32)
-            self._font_ui = pygame.font.Font(None, 20)
-            self._font_btn = pygame.font.Font(None, 19)
-            self._font_win = pygame.font.Font(None, 52)
-            self._font_menu_title = pygame.font.Font(None, 64)
-            self._font_menu_btn = pygame.font.Font(None, 32)
+        self._font_title = pygame.font.Font(None, 28)
+        self._font_title.set_bold(True)
+        self._font_ui = pygame.font.Font(None, 18)
+        self._font_btn = pygame.font.Font(None, 17)
+        self._font_win = pygame.font.Font(None, 48)
+        self._font_win.set_bold(True)
+        self._font_menu_title = pygame.font.Font(None, 56)
+        self._font_menu_title.set_bold(True)
+        self._font_menu_btn = pygame.font.Font(None, 24)
 
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
         self._menu = Menu(C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn)
