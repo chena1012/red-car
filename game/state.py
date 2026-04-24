@@ -139,3 +139,39 @@ class GameState:
         v.row += dr
         v.col += dc
         return True
+
+    def max_steps_in_direction(
+        self, vehicle_id: str, dr: int, dc: int, max_steps: int | None = None
+    ) -> int:
+        """Return how many continuous steps the vehicle can move in a direction."""
+        v = self.get_vehicle(vehicle_id)
+        if v is None:
+            return 0
+
+        if v.horizontal:
+            if dr != 0 or dc not in (-1, 1):
+                return 0
+        else:
+            if dc != 0 or dr not in (-1, 1):
+                return 0
+
+        steps = 0
+        row, col = v.row, v.col
+        while max_steps is None or steps < max_steps:
+            trial = Vehicle(
+                v.id,
+                row + dr,
+                col + dc,
+                v.length,
+                v.horizontal,
+                v.color,
+                v.is_target,
+            )
+            if not self._all_cells_respect_board_rules(trial):
+                break
+            if self._has_overlap_on_board(trial, v.id):
+                break
+            row += dr
+            col += dc
+            steps += 1
+        return steps
