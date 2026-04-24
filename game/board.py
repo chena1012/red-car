@@ -17,30 +17,5 @@ class Board:
     def topleft(self) -> tuple[int, int]:
         return self._topleft
 
-    def draw(self, surface: pygame.Surface) -> None:
-        x0, y0 = self._topleft
-        w = C.GRID_COLS * C.CELL_SIZE
-        h = C.GRID_ROWS * C.CELL_SIZE
-        board_rect = pygame.Rect(x0, y0, w, h)
-
-        pygame.draw.rect(surface, C.COLOR_BOARD, board_rect)
-
-        line_width = 2
-        for c in range(C.GRID_COLS + 1):
-            px = x0 + c * C.CELL_SIZE
-            pygame.draw.line(
-                surface,
-                C.COLOR_GRID_LINE,
-                (px, y0),
-                (px, y0 + h),
-                line_width,
-            )
-        for r in range(C.GRID_ROWS + 1):
-            py = y0 + r * C.CELL_SIZE
-            pygame.draw.line(
-                surface,
-                C.COLOR_GRID_LINE,
-                (x0, py),
-                (x0 + w, py),
-                line_width,
-            )
+    def draw(self, surface: pygame.Surface, board_bg: pygame.Surface) -> None:
+        surface.blit(board_bg, self._topleft)

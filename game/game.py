@@ -50,6 +50,11 @@ class Game:
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
         self._menu = Menu(C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn)
 
+        self._board_bg = pygame.image.load(C.BOARD_BG_PATH).convert()
+        self._board_bg = pygame.transform.smoothscale(
+            self._board_bg,
+       (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
+    )
     def run(self) -> None:
         running = True
         while running:
@@ -313,7 +318,7 @@ class Game:
             self._level_index,
             level_count(),
         )
-        self._board.draw(self._screen)
+        self._board.draw(self._screen, self._board_bg)
         self._draw_exit_portal()
         self._draw_vehicles()
         self._draw_hud()

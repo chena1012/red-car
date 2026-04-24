@@ -1,4 +1,11 @@
 """Global constants: Window, Board, Exit, Colors, FPS, UI dimensions."""
+import os
+
+# --- Paths ---
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
+BOARD_BG_PATH = os.path.join(IMAGES_DIR, "board_bg.png")
 
 # --- Board ---
 CELL_SIZE = 90  # Cell size in pixels
