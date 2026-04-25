@@ -53,10 +53,6 @@ class Game:
         self._state: GameState = load_game_state(self._level_index)
 
         self._selected_id: str | None = None
-        self._powerup_activity = False
-        self._removed_cars: set[str] = set()
-        self._powerup_remain = 3
-
         self._steps = 0
         self._elapsed_ms = 0
         self._won = False
@@ -106,8 +102,6 @@ class Game:
         self._elapsed_ms = 0
         self._won = False
         self._selected_id = None
-        self._removed_cars.clear()
-        self._powerup_remain = 3
         self._move_anim = None
 
     def _reset_current_level(self) -> None:
@@ -117,9 +111,6 @@ class Game:
         self._elapsed_ms = 0
         self._won = False
         self._selected_id = None
-        self._powerup_activity = False
-        self._removed_cars.clear()
-        self._powerup_remain = 3
         self._move_anim = None
 
     def _time_star_limit_seconds(self, level_index: int) -> int:
@@ -183,11 +174,7 @@ class Game:
         if action == "prev":
             self._go_previous_level()
             return
-        if action == "powerup":
-            if self._powerup_remain > 0:
-                self._powerup_activity = True
-                self._selected_id = None
-            return
+
         if self._won:
             return
 
@@ -200,14 +187,6 @@ class Game:
             return
         row, col = cell
         v = self._state.occupant_at(row, col)
-
-        if self._powerup_activity and v is not None and not v.is_target:
-            self._removed_cars.add(v.id)
-            self._powerup_activity = False
-            self._powerup_remain -= 1
-            return
-        
-        self._selected_id = v.id if v else None
         if v is not None:
             self._selected_id = v.id
             return
@@ -467,12 +446,8 @@ class Game:
 
     def _draw_vehicles(self) -> None:
         for v in self._state.vehicles:
-            if v.id in self._removed_cars:
-                continue
-
             body = self._vehicle_draw_rect(v)
             pygame.draw.rect(self._screen, v.color, body, border_radius=8)
-
             if v.is_target:
                 pygame.draw.rect(
                     self._screen,
@@ -489,22 +464,7 @@ class Game:
                     width=4,
                     border_radius=10,
                 )
-            if self._powerup_activity:
-                if not v.is_target:
-                    pygame.draw.rect(
-                        self._screen,
-                        C.COLOR_POWERUP_OUTLINE,
-                        body,
-                        width=10,
-                        border_radius=10,
-                    )
-                    pygame.draw.rect(
-                    self._screen,
-                    (255,255,255), #白色内边
-                    body.inflate(6,6),
-                    width=2,
-                    border_radius=10,
-                    )
+
     def _draw_win_overlay(self) -> None:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
         w, h = self._screen.get_size()
@@ -664,7 +624,6 @@ class Game:
             mouse,
             self._level_index,
             level_count(),
-            self._powerup_remain
         )
         self._board.draw(self._screen, self._board_bg)
         self._draw_exit_portal()
