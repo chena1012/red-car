@@ -53,10 +53,6 @@ class Game:
         self._state: GameState = load_game_state(self._level_index)
 
         self._selected_id: str | None = None
-        self._powerup_activity = False
-        self._removed_cars: set[str] = set()
-        self._powerup_remain = 3
-
         self._steps = 0
         self._elapsed_ms = 0
         self._won = False
@@ -106,8 +102,6 @@ class Game:
         self._elapsed_ms = 0
         self._won = False
         self._selected_id = None
-        self._removed_cars.clear()
-        self._powerup_remain = 3
         self._move_anim = None
 
     def _reset_current_level(self) -> None:
@@ -117,9 +111,6 @@ class Game:
         self._elapsed_ms = 0
         self._won = False
         self._selected_id = None
-        self._powerup_activity = False
-        self._removed_cars.clear()
-        self._powerup_remain = 3
         self._move_anim = None
 
     def _time_star_limit_seconds(self, level_index: int) -> int:
@@ -183,11 +174,7 @@ class Game:
         if action == "prev":
             self._go_previous_level()
             return
-        if action == "powerup":
-            if self._powerup_remain > 0:
-                self._powerup_activity = True
-                self._selected_id = None
-            return
+
         if self._won:
             return
 
@@ -200,14 +187,6 @@ class Game:
             return
         row, col = cell
         v = self._state.occupant_at(row, col)
-
-        if self._powerup_activity and v is not None and not v.is_target:
-            self._removed_cars.add(v.id)
-            self._powerup_activity = False
-            self._powerup_remain -= 1
-            return
-        
-        self._selected_id = v.id if v else None
         if v is not None:
             self._selected_id = v.id
             return
@@ -231,55 +210,6 @@ class Game:
         else:
             return
 
-        # 找到选中的车
-        selected = None
-        for v in self._state.vehicles:
-            if v.id == self._selected_id:
-                selected = v
-                break
-        if not selected:
-            return
-
-        # 固定方向：横向车只能左右，纵向只能上下
-        if selected.horizontal:
-            dr = 0
-        else:
-            dc = 0
-
-        # 计算移动后的所有格子
-        next_cells = []
-        if selected.horizontal:
-            new_col = selected.col + dc
-            for i in range(selected.length):
-                next_cells.append((selected.row, new_col + i))
-        else:
-            new_row = selected.row + dr
-            for i in range(selected.length):
-                next_cells.append((new_row + i, selected.col))
-
-        # 检查是否与【未被移除】的车重叠 → 真正不挡道
-        can_move = True
-        for (r, c) in next_cells:
-            for v in self._state.vehicles:
-                # 跳过自己 + 跳过被移除的车
-                if v.id == selected.id or v.id in self._removed_cars:
-                    continue
-
-            # 用你自带的 cells() 判断是否占格
-                if (r, c) in v.cells():
-                    can_move = False
-                    break
-            if not can_move:
-                break
-
-        # 可以移动就移动
-        if can_move:
-            dist = dc if selected.horizontal else dr
-            selected.move(dist)
-            self._steps += 1
-            if self._state.is_won():
-                self._won = True
-        
         self._start_move_animation(self._selected_id, dr, dc, max_steps=1)
 
     def _update(self, dt: int) -> None:
@@ -441,12 +371,8 @@ class Game:
 
     def _draw_vehicles(self) -> None:
         for v in self._state.vehicles:
-            if v.id in self._removed_cars:
-                continue
-
             body = self._vehicle_draw_rect(v)
             pygame.draw.rect(self._screen, v.color, body, border_radius=8)
-
             if v.is_target:
                 pygame.draw.rect(
                     self._screen,
@@ -463,22 +389,7 @@ class Game:
                     width=4,
                     border_radius=10,
                 )
-            if self._powerup_activity:
-                if not v.is_target:
-                    pygame.draw.rect(
-                        self._screen,
-                        C.COLOR_POWERUP_OUTLINE,
-                        body,
-                        width=10,
-                        border_radius=10,
-                    )
-                    pygame.draw.rect(
-                    self._screen,
-                    (255,255,255), #白色内边
-                    body.inflate(6,6),
-                    width=2,
-                    border_radius=10,
-                    )
+
     def _draw_win_overlay(self) -> None:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
         w, h = self._screen.get_size()
@@ -638,7 +549,6 @@ class Game:
             mouse,
             self._level_index,
             level_count(),
-            self._powerup_remain
         )
         self._board.draw(self._screen, self._board_bg)
         self._draw_exit_portal()
