@@ -1,6 +1,7 @@
 """Main game class: loop, level index, input events, drawing and victory prompts."""
 
 from __future__ import annotations
+from game.audio import audio
 
 import sys
 from dataclasses import dataclass
@@ -17,7 +18,7 @@ from .levels import level_count, load_game_state
 from .state import GameState
 from .vehicle import Vehicle
 
-
+audio.play_bgm()
 @dataclass
 class MoveAnimation:
     vehicle_id: str
@@ -39,6 +40,7 @@ class WinStars:
 
 class Game:
     def __init__(self) -> None:
+        self.audio = None
         pygame.init()
         pygame.display.set_caption("Little Red Car Game")
 
@@ -79,6 +81,8 @@ class Game:
        (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
         )
 
+        audio.play_bgm()
+
     def run(self) -> None:
         running = True
         while running:
@@ -95,6 +99,8 @@ class Game:
 
     def _load_level(self, index: int) -> None:
         """Switch to a level and reset steps, victory status and selection."""
+        audio.restart_bgm()  # 新关卡从头放BGM
+        audio.load_all_sfx()
         n = level_count()
         self._level_index = index % n
         self._state = load_game_state(self._level_index)
@@ -106,6 +112,8 @@ class Game:
 
     def _reset_current_level(self) -> None:
         """Reset the current level layout."""
+        audio.restart_bgm()  # 新关卡从头放BGM
+        audio.load_all_sfx()
         self._state = load_game_state(self._level_index)
         self._steps = 0
         self._elapsed_ms = 0
@@ -137,9 +145,13 @@ class Game:
 
     def _go_next_level(self) -> None:
         self._load_level(self._level_index + 1)
+        audio.restart_bgm()  # 新关卡从头放BGM
+        audio.load_all_sfx()
 
     def _go_previous_level(self) -> None:
         self._load_level(self._level_index - 1)
+        audio.restart_bgm()  # 新关卡从头放BGM
+        audio.load_all_sfx()
 
     def _handle_events(self) -> bool:
         for event in pygame.event.get():
@@ -189,6 +201,7 @@ class Game:
         v = self._state.occupant_at(row, col)
         if v is not None:
             self._selected_id = v.id
+            audio.play_select()
             return
 
         if self._selected_id is not None:
@@ -223,8 +236,10 @@ class Game:
             if v is not None:
                 v.move(anim.distance)
                 self._steps += 1
+                audio.play_move()
                 if self._state.is_won():
                     self._won = True
+                    audio.play_win()
                     if self._is_new_best_steps():
                         self._best_steps_by_level[self._level_index] = self._steps
             self._move_anim = None

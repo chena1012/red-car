@@ -68,3 +68,20 @@ VEHICLE_INSET = 6
 # Movement animation
 MOVE_SPEED_PX_PER_SEC = 420
 MOVE_MIN_DURATION_MS = 120
+
+# --- Audio ---
+SOUNDS_DIR = os.path.join(ASSETS_DIR, "sounds")
+
+SFX_CLICK = os.path.join(SOUNDS_DIR, "click.wav")
+SFX_SELECT = os.path.join(SOUNDS_DIR, "select.wav")
+SFX_MOVE = os.path.join(SOUNDS_DIR, "move.wav")
+SFX_WIN = os.path.join(SOUNDS_DIR, "win.wav")
+BGM_PATH = os.path.join(SOUNDS_DIR, "bgm.mp3")
+
+# --- Volume Control (全局统一调节) ---
+VOLUME_MUSIC = 0.25    # 背景音乐总音量
+VOLUME_SFX_MASTER = 0.7# 所有音效总音量
+VOLUME_CLICK = 1.0
+VOLUME_SELECT = 0.9
+VOLUME_MOVE = 0.8
+VOLUME_WIN = 1.0

@@ -1,6 +1,7 @@
 """Info panels and Menu screen implementation."""
 
 from __future__ import annotations
+from game.audio import audio
 
 import pygame
 
@@ -17,6 +18,14 @@ class Menu:
         self._title_font = title_font
         self._button_font = button_font
         self._buttons: dict[str, Button] = {}
+
+        self.click_sound = None
+        try:
+            self.click_sound = pygame.mixer.Sound(C.SFX_CLICK)
+            self.click_sound.set_volume(0.6)
+        except:
+            print("No click sound found")
+
         self._layout()
 
     def _layout(self) -> None:
@@ -59,5 +68,7 @@ class Menu:
     def action_at(self, pos: tuple[int, int]) -> str | None:
         for key, btn in self._buttons.items():
             if btn.contains(pos):
+                from game.audio import audio
+                audio.play_click()
                 return key
         return None
