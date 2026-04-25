@@ -1,4 +1,11 @@
 """Global constants: Window, Board, Exit, Colors, FPS, UI dimensions."""
+import os
+
+# --- Paths ---
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
+BOARD_BG_PATH = os.path.join(IMAGES_DIR, "board_bg.png")
 
 # --- Board ---
 CELL_SIZE = 90  # Cell size in pixels
@@ -43,6 +50,9 @@ COLOR_POWERUP_OUTLINE = (250, 204, 21)
 COLOR_WIN_OVERLAY = (15, 18, 24, 200)
 COLOR_WIN_TEXT = (241, 245, 249)
 COLOR_WIN_PANEL = (51, 65, 85)
+COLOR_STAR_ON = (250, 204, 21)
+COLOR_STAR_OFF_FILL = (71, 85, 105)
+COLOR_STAR_OFF_BORDER = (148, 163, 184)
 
 # Buttons
 BUTTON_HEIGHT = 34
@@ -55,3 +65,7 @@ COLOR_BUTTON_TEXT = (241, 245, 249)
 
 # Vehicle inset from cell boundary
 VEHICLE_INSET = 6
+
+# Movement animation
+MOVE_SPEED_PX_PER_SEC = 420
+MOVE_MIN_DURATION_MS = 120
