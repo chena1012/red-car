@@ -195,7 +195,7 @@ class Game:
             self._try_click_move_to_cell(row, col)
 
     def _on_key_down(self, key: int) -> None:
-        if self._won or self._selected_id is None or self._move_anim is not None:
+        if self._won or self._selected_id is None:
             return
 
         dr, dc = 0, 0
@@ -208,9 +208,84 @@ class Game:
         elif key == pygame.K_DOWN:
             dr = 1
         else:
+            return          
+
+        # 找到选中的车
+        selected = None
+        for v in self._state.vehicles:
+            if v.id == self._selected_id:
+                selected = v
+                break
+        if not selected:
             return
 
-        self._start_move_animation(self._selected_id, dr, dc, max_steps=1)
+        # 固定方向：横向车只能左右，纵向只能上下
+        if selected.horizontal:
+            dr = 0
+        else:
+            dc = 0
+
+        # 计算移动后的所有格子
+        next_cells = []
+        if selected.horizontal:
+            new_col = selected.col + dc
+            for i in range(selected.length):
+                next_cells.append((selected.row, new_col + i))
+        else:
+            new_row = selected.row + dr
+            for i in range(selected.length):
+                next_cells.append((new_row + i, selected.col))
+
+   
+        can_move = True
+        for (r, c) in next_cells:
+            # 1. 行永远不能出界（所有车都不能上下出棋盘）
+            if r < 0 or r >= C.GRID_ROWS:
+                can_move = False
+                break
+
+            # 2. 列边界判断
+            if not selected.is_target:
+                # 非目标车：左右都不能出棋盘
+                if c < 0 or c >= C.GRID_COLS:
+                    can_move = False
+                    break
+            else:
+                # 目标小红车：只能向右驶出出口，不能向左出界，且必须在出口行
+                if c < 0:
+                    can_move = False
+                    break
+                # 只有在出口行，才允许向右驶出棋盘
+                if r != C.EXIT_ROW and c >= C.GRID_COLS:
+                    can_move = False
+                    break
+        if not can_move:
+            return
+    
+
+        # 碰撞检查：忽略被PowerUp移除的车
+        for (r, c) in next_cells:
+            # 小红车驶出棋盘的部分，不用做碰撞检查
+            if selected.is_target and c >= C.GRID_COLS:
+                continue
+            for v in self._state.vehicles:
+                # 跳过自己 + 跳过被移除的车
+                if v.id == selected.id or v.id in self._removed_cars:
+                    continue
+                if (r, c) in v.cells():
+                    can_move = False
+                    break
+            if not can_move:
+                break
+
+        # 可以移动就执行移动
+        if can_move:
+            dist = dc if selected.horizontal else dr
+            selected.move(dist)
+            self._steps += 1
+            # 移动后判断是否胜利
+            if self._state.is_won():
+                self._won = True
 
     def _update(self, dt: int) -> None:
         if self._move_anim is None:
