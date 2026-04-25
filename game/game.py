@@ -10,11 +10,12 @@ from math import cos, pi, sin
 import pygame
 
 from ui.hud import ControlBar
-from ui.panels import Menu
+from ui.panels import LevelSelect, Menu, PausePanel
 
 from . import constants as C
 from .board import Board
 from .levels import level_count, load_game_state
+from .save_manager import SaveManager
 from .state import GameState
 from .vehicle import Vehicle
 
@@ -58,9 +59,16 @@ class Game:
         self._steps = 0
         self._elapsed_ms = 0
         self._won = False
-        self._state_name = "MENU"  # "MENU" or "PLAYING"
+        self._state_name = "MENU"  # "MENU" or "LEVEL_SELECT" or "PLAYING" or "PAUSED"
         self._move_anim: MoveAnimation | None = None
         self._best_steps_by_level: dict[int, int] = {}
+        self._best_stars_by_level: dict[int, int] = {}
+        self._unlocked_levels = 1
+        self._status_text = ""
+        self._status_ms_left = 0
+        self._save_manager = SaveManager()
+        self._load_game_metadata()
+        self._state_name = "MENU"
 
         self._font_title = pygame.font.Font(None, 28)
         self._font_title.set_bold(True)
@@ -74,6 +82,12 @@ class Game:
 
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
         self._menu = Menu(C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn)
+        self._level_select = LevelSelect(
+            C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn
+        )
+        self._pause_panel = PausePanel(
+            C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn
+        )
 
         self._board_bg = pygame.image.load(C.BOARD_BG_PATH).convert()
         self._board_bg = pygame.transform.smoothscale(
@@ -102,7 +116,8 @@ class Game:
         audio.restart_bgm()  # 新关卡从头放BGM
         audio.load_all_sfx()
         n = level_count()
-        self._level_index = index % n
+        max_level = max(min(self._unlocked_levels, n) - 1, 0)
+        self._level_index = max(0, min(index, max_level))
         self._state = load_game_state(self._level_index)
         self._steps = 0
         self._elapsed_ms = 0
@@ -120,6 +135,137 @@ class Game:
         self._won = False
         self._selected_id = None
         self._move_anim = None
+
+    def _set_status(self, text: str, duration_ms: int = 2200) -> None:
+        self._status_text = text
+        self._status_ms_left = duration_ms
+
+    def _build_save_payload(self) -> dict:
+        return {
+            "level_index": self._level_index,
+            "steps": self._steps,
+            "elapsed_ms": self._elapsed_ms,
+            "won": self._won,
+            "unlocked_levels": self._unlocked_levels,
+            "selected_id": self._selected_id,
+            "vehicles": self._state.export_positions(),
+            "best_steps_by_level": {
+                str(k): int(v) for k, v in self._best_steps_by_level.items()
+            },
+            "best_stars_by_level": {
+                str(k): int(v) for k, v in self._best_stars_by_level.items()
+            },
+        }
+
+    def _save_game(self) -> bool:
+        if self._move_anim is not None:
+            self._set_status("Cannot save during animation.")
+            return False
+        ok, msg = self._save_manager.save(self._build_save_payload())
+        self._set_status(msg)
+        if ok:
+            audio.play_click()
+        return ok
+
+    def _save_without_progress(self) -> bool:
+        """保存全局进度（解锁关卡、最高分），但清除当前关卡的即时进度存档。"""
+        payload = {
+            "level_index": -1,  # 设置为非法索引，确保下次进入关卡时不会恢复位置
+            "unlocked_levels": self._unlocked_levels,
+            "best_steps_by_level": {
+                str(k): int(v) for k, v in self._best_steps_by_level.items()
+            },
+            "best_stars_by_level": {
+                str(k): int(v) for k, v in self._best_stars_by_level.items()
+            },
+        }
+        ok, _ = self._save_manager.save(payload)
+        return ok
+
+    def _load_game_metadata(self) -> None:
+        """只加载全局元数据（如解锁进度、最高分），不加载具体关卡状态。"""
+        data, msg = self._save_manager.load()
+        if data is None:
+            return
+        
+        n = level_count()
+        self._unlocked_levels = max(1, min(int(data.get("unlocked_levels", 1)), n))
+        
+        # 加载最高分和星星
+        raw_best = data.get("best_steps_by_level", {})
+        if isinstance(raw_best, dict):
+            for k, v in raw_best.items():
+                ik, iv = int(k), int(v)
+                if 0 <= ik < n and iv >= 0:
+                    self._best_steps_by_level[ik] = iv
+                    
+        raw_stars = data.get("best_stars_by_level", {})
+        if isinstance(raw_stars, dict):
+            for k, v in raw_stars.items():
+                ik, iv = int(k), int(v)
+                if 0 <= ik < n and 0 <= iv <= 3:
+                    self._best_stars_by_level[ik] = iv
+
+    def _load_game(self) -> None:
+        if self._move_anim is not None:
+            self._set_status("Cannot load during animation.")
+            return
+        data, msg = self._save_manager.load()
+        if data is None:
+            self._set_status(msg)
+            return
+        if not self._apply_save_data(data):
+            self._set_status("Invalid save data. Restore failed.")
+            return
+        self._set_status("Loaded successfully.")
+        audio.play_click()
+
+    def _apply_save_data(self, data: dict) -> bool:
+        n = level_count()
+        try:
+            unlocked = int(data.get("unlocked_levels", 1))
+            unlocked = max(1, min(unlocked, n))
+            level_idx = int(data["level_index"])
+            if level_idx < 0 or level_idx >= unlocked:
+                return False
+
+            state = load_game_state(level_idx)
+            if not state.apply_positions(list(data["vehicles"])):
+                return False
+
+            self._unlocked_levels = unlocked
+            self._level_index = level_idx
+            self._state = state
+            self._steps = max(0, int(data.get("steps", 0)))
+            self._elapsed_ms = max(0, int(data.get("elapsed_ms", 0)))
+            self._won = bool(data.get("won", False))
+            selected_id = data.get("selected_id")
+            self._selected_id = selected_id if isinstance(selected_id, str) else None
+            if self._selected_id is not None and self._state.get_vehicle(self._selected_id) is None:
+                self._selected_id = None
+            raw_best = data.get("best_steps_by_level", {})
+            parsed_best: dict[int, int] = {}
+            if isinstance(raw_best, dict):
+                for k, v in raw_best.items():
+                    ik = int(k)
+                    iv = int(v)
+                    if 0 <= ik < n and iv >= 0:
+                        parsed_best[ik] = iv
+            self._best_steps_by_level = parsed_best
+            raw_stars = data.get("best_stars_by_level", {})
+            parsed_stars: dict[int, int] = {}
+            if isinstance(raw_stars, dict):
+                for k, v in raw_stars.items():
+                    ik = int(k)
+                    iv = int(v)
+                    if 0 <= ik < n and 0 <= iv <= 3:
+                        parsed_stars[ik] = iv
+            self._best_stars_by_level = parsed_stars
+            self._move_anim = None
+            self._state_name = "PLAYING"
+            return True
+        except (KeyError, TypeError, ValueError):
+            return False
 
     def _time_star_limit_seconds(self, level_index: int) -> int:
         # Harder levels get a bit more time budget.
@@ -144,14 +290,16 @@ class Game:
         )
 
     def _go_next_level(self) -> None:
+        if self._level_index + 1 >= self._unlocked_levels:
+            self._set_status("Next level is locked.")
+            return
         self._load_level(self._level_index + 1)
-        audio.restart_bgm()  # 新关卡从头放BGM
-        audio.load_all_sfx()
 
     def _go_previous_level(self) -> None:
+        if self._level_index - 1 < 0:
+            self._set_status("Already at the first level.")
+            return
         self._load_level(self._level_index - 1)
-        audio.restart_bgm()  # 新关卡从头放BGM
-        audio.load_all_sfx()
 
     def _handle_events(self) -> bool:
         for event in pygame.event.get():
@@ -161,18 +309,51 @@ class Game:
                 if self._state_name == "MENU":
                     action = self._menu.action_at(event.pos)
                     if action == "start":
-                        self._state_name = "PLAYING"
-                        self._reset_current_level()
+                        self._state_name = "LEVEL_SELECT"
                     elif action == "exit":
                         return False
-                else:
+                elif self._state_name == "LEVEL_SELECT":
+                    action = self._level_select.action_at(event.pos, self._unlocked_levels)
+                    if isinstance(action, tuple) and action[0] == "level":
+                        self._state_name = "PLAYING"
+                        self._load_level(action[1])
+                        # 如果存档中正好是这一关，则尝试应用存档中的车辆位置和步数
+                        data, _ = self._save_manager.load()
+                        if data and int(data.get("level_index", -1)) == action[1]:
+                            self._apply_save_data(data)
+                    elif action == "back":
+                        self._state_name = "MENU"
+                    elif action == "locked":
+                        self._set_status("This level is locked.")
+                elif self._state_name == "PAUSED":
+                    action = self._pause_panel.action_at(event.pos)
+                    if action == "continue":
+                        self._state_name = "PLAYING"
+                    elif action == "save_exit":
+                        if self._save_game():
+                            self._state_name = "LEVEL_SELECT"
+                            self._selected_id = None
+                            self._move_anim = None
+                    elif action == "exit_no_save":
+                        self._save_without_progress()
+                        self._load_level(self._level_index) # 内存中也立即重置
+                        self._state_name = "LEVEL_SELECT"
+                        self._selected_id = None
+                        self._move_anim = None
+                elif self._state_name == "PLAYING":
                     self._on_mouse_down(event.pos)
             elif event.type == pygame.KEYDOWN:
                 if self._state_name == "PLAYING":
+                    if event.key == pygame.K_ESCAPE:
+                        self._state_name = "PAUSED"
+                        continue
                     self._on_key_down(event.key)
                 elif self._state_name == "MENU" and event.key == pygame.K_RETURN:
+                    self._state_name = "LEVEL_SELECT"
+                elif self._state_name == "LEVEL_SELECT" and event.key == pygame.K_ESCAPE:
+                    self._state_name = "MENU"
+                elif self._state_name == "PAUSED" and event.key == pygame.K_ESCAPE:
                     self._state_name = "PLAYING"
-                    self._reset_current_level()
         return True
 
     def _on_mouse_down(self, pos: tuple[int, int]) -> None:
@@ -185,6 +366,10 @@ class Game:
             return
         if action == "prev":
             self._go_previous_level()
+            return
+        if action == "pause":
+            if not self._won:
+                self._state_name = "PAUSED"
             return
 
         if self._won:
@@ -226,6 +411,11 @@ class Game:
         self._start_move_animation(self._selected_id, dr, dc, max_steps=1)
 
     def _update(self, dt: int) -> None:
+        if self._status_ms_left > 0:
+            self._status_ms_left = max(0, self._status_ms_left - dt)
+            if self._status_ms_left == 0:
+                self._status_text = ""
+
         if self._move_anim is None:
             return
 
@@ -237,12 +427,19 @@ class Game:
                 v.move(anim.distance)
                 self._steps += 1
                 audio.play_move()
-                if self._state.is_won():
-                    self._won = True
-                    audio.play_win()
-                    if self._is_new_best_steps():
-                        self._best_steps_by_level[self._level_index] = self._steps
             self._move_anim = None
+            if self._state.is_won():
+                self._won = True
+                audio.play_win()
+                if self._is_new_best_steps():
+                    self._best_steps_by_level[self._level_index] = self._steps
+                stars_total = self._get_win_stars().total
+                prev = self._best_stars_by_level.get(self._level_index, 0)
+                self._best_stars_by_level[self._level_index] = max(prev, stars_total)
+                self._unlocked_levels = min(
+                    level_count(), max(self._unlocked_levels, self._level_index + 2)
+                )
+                self._save_without_progress()  # 胜利后保存元数据，不保留本关车辆位置
 
     def _try_click_move_to_cell(self, row: int, col: int) -> None:
         if self._selected_id is None:
@@ -334,6 +531,12 @@ class Game:
             bottomright=(C.WINDOW_WIDTH - 16, C.WINDOW_HEIGHT - 12)
         )
         self._screen.blit(steps_surf, steps_rect)
+        if self._status_text:
+            status_surf = self._font_ui.render(self._status_text, True, C.COLOR_TITLE)
+            status_rect = status_surf.get_rect(
+                center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 12 - status_surf.get_height() // 2)
+            )
+            self._screen.blit(status_surf, status_rect)
 
     def _cell_rect_pixels(self, row: int, col: int) -> pygame.Rect:
         x0, y0 = self._board.topleft
@@ -555,6 +758,20 @@ class Game:
             mouse = pygame.mouse.get_pos()
             self._menu.draw(self._screen, mouse)
             return
+        if self._state_name == "LEVEL_SELECT":
+            mouse = pygame.mouse.get_pos()
+            self._level_select.draw(
+                self._screen,
+                mouse,
+                level_total=level_count(),
+                unlocked_count=self._unlocked_levels,
+                stars_by_level=self._best_stars_by_level,
+            )
+            if self._status_text:
+                status_surf = self._font_ui.render(self._status_text, True, C.COLOR_TITLE)
+                status_rect = status_surf.get_rect(center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 22))
+                self._screen.blit(status_surf, status_rect)
+            return
 
         self._screen.fill(C.COLOR_BG)
         self._draw_title()
@@ -569,5 +786,8 @@ class Game:
         self._draw_exit_portal()
         self._draw_vehicles()
         self._draw_hud()
+        if self._state_name == "PAUSED":
+            self._pause_panel.draw(self._screen, mouse)
+            return
         if self._won:
             self._draw_win_overlay()

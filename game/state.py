@@ -175,3 +175,37 @@ class GameState:
             col += dc
             steps += 1
         return steps
+
+    def export_positions(self) -> list[dict[str, int | str]]:
+        """导出车辆位置快照，用于存档。"""
+        return [{"id": v.id, "row": v.row, "col": v.col} for v in self._vehicles]
+
+    def apply_positions(self, positions: list[dict[str, int | str]]) -> bool:
+        """按 id 恢复车辆位置；若数据非法则不改动并返回 False。"""
+        by_id = {v.id: v for v in self._vehicles}
+        if len(positions) != len(self._vehicles):
+            return False
+
+        original = {v.id: (v.row, v.col) for v in self._vehicles}
+        seen: set[str] = set()
+        try:
+            for item in positions:
+                vid = str(item.get("id", ""))
+                if vid not in by_id or vid in seen:
+                    raise ValueError("invalid vehicle id")
+                row = int(item["row"])
+                col = int(item["col"])
+                by_id[vid].row = row
+                by_id[vid].col = col
+                seen.add(vid)
+            if self.has_any_overlap():
+                raise ValueError("overlap")
+            for v in self._vehicles:
+                if not self._all_cells_respect_board_rules(v):
+                    raise ValueError("out of board")
+        except (KeyError, TypeError, ValueError):
+            for v in self._vehicles:
+                old = original[v.id]
+                v.row, v.col = old
+            return False
+        return True
