@@ -371,6 +371,18 @@ class Game:
             if not self._won:
                 self._state_name = "PAUSED"
             return
+        if action == "powerup":
+            if self._powerup_remain > 0:
+                self._powerup_active = True
+                self._selected_id = None  
+            return
+        
+        cell = self._screen_pos_to_cell(pos)
+        if cell is None:
+            self._selected_id = None
+            return
+        row, col = cell
+        v = self._state.occupant_at(row, col)
 
         if self._won:
             return
@@ -473,6 +485,70 @@ class Game:
     ) -> None:
         if self._move_anim is not None:
             return
+
+        v = self._state.get_vehicle(vehicle_id)
+        if v is None:
+            return
+
+        # 方向锁定（完全正确）
+        if v.horizontal:
+            dr = 0  # 横向车：只能左右
+        else:
+            dc = 0  # 纵向车：只能上下
+
+        moved = 0
+        max_move = max_steps if max_steps is not None else 999
+
+        for _ in range(max_move):
+            next_r = v.row + dr * (moved + 1)
+            next_c = v.col + dc * (moved + 1)
+            safe = True
+
+            # 先收集这辆车要移动到的所有格子
+            cells = []
+            for i in range(v.length):
+                r = next_r + (0 if v.horizontal else i)
+                c = next_c + (i if v.horizontal else 0)
+                cells.append((r, c))
+
+            # 检查边界
+            for (r, c) in cells:
+                if r < 0 or r >= C.GRID_ROWS:
+                    safe = False
+                if c < 0:
+                    safe = False
+                if c >= C.GRID_COLS and not (v.is_target and r == C.EXIT_ROW):
+                    safe = False
+
+            # 检查碰撞（独立检查！不会卡左移！）
+            if safe:
+                for other in self._state.vehicles:
+                    if other.id == v.id or other.id in self._remove_cars:
+                        continue
+                    for (r, c) in cells:
+                        if (r, c) in other.cells():
+                            safe = False
+                            break
+                    if not safe:
+                        break
+
+            if safe:
+                moved += 1
+            else:
+                break
+
+        if moved <= 0:
+            return
+
+        dist = moved * (dr + dc)
+        px = abs(dist) * C.CELL_SIZE
+        dur = max(C.MOVE_MIN_DURATION_MS, int(1000 * px / C.MOVE_SPEED_PX_PER_SEC))
+
+        self._move_anim = MoveAnimation(
+            vehicle_id=vehicle_id,
+            distance=dist,
+            elapsed_ms=0,
+            duration_ms=dur
         steps = self._state.max_steps_in_direction(vehicle_id, dr, dc, max_steps)
         if steps <= 0:
             return
