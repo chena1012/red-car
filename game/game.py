@@ -383,7 +383,7 @@ class Game:
         if action == "powerup":
             if self._powerup_remain > 0:
                 self._powerup_active = True
-                self._selected_id = None  # 取消车辆选中，避免冲突
+                self._selected_id = None  
             return
         
         cell = self._screen_pos_to_cell(pos)
