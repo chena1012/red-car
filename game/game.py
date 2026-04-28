@@ -56,9 +56,6 @@ class Game:
         self._state: GameState = load_game_state(self._level_index)
 
         self._selected_id: str | None = None
-        self._powerup_active = False
-        self._remove_cars: set[str] = set()
-        self._powerup_remain = 3
         self._steps = 0
         self._elapsed_ms = 0
         self._won = False
@@ -127,9 +124,6 @@ class Game:
         self._won = False
         self._selected_id = None
         self._move_anim = None
-        self._powerup_active = False
-        self._remove_cars: set[str] = set()
-        self._powerup_remain = 3
 
     def _reset_current_level(self) -> None:
         """Reset the current level layout."""
@@ -141,9 +135,6 @@ class Game:
         self._won = False
         self._selected_id = None
         self._move_anim = None
-        self._powerup_active = False
-        self._remove_cars: set[str] = set()
-        self._powerup_remain = 3
 
     def _set_status(self, text: str, duration_ms: int = 2200) -> None:
         self._status_text = text
@@ -399,12 +390,12 @@ class Game:
         if self._move_anim is not None:
             return
 
-        if self._powerup_active and v is not None and not v.is_target:
-            self._remove_cars.add(v.id)
-            self._powerup_active = False
-            self._powerup_remain -= 1   # 消耗一次
+        cell = self._screen_pos_to_cell(pos)
+        if cell is None:
+            self._selected_id = None
             return
-
+        row, col = cell
+        v = self._state.occupant_at(row, col)
         if v is not None:
             self._selected_id = v.id
             audio.play_select()
@@ -412,8 +403,6 @@ class Game:
 
         if self._selected_id is not None:
             self._try_click_move_to_cell(row, col)
-
-        self._selected_id = v.id if v else None
 
     def _on_key_down(self, key: int) -> None:
         if self._won or self._selected_id is None or self._move_anim is not None:
@@ -432,7 +421,7 @@ class Game:
             return
 
         self._start_move_animation(self._selected_id, dr, dc, max_steps=1)
-        
+
     def _update(self, dt: int) -> None:
         if self._status_ms_left > 0:
             self._status_ms_left = max(0, self._status_ms_left - dt)
@@ -560,6 +549,20 @@ class Game:
             distance=dist,
             elapsed_ms=0,
             duration_ms=dur
+        steps = self._state.max_steps_in_direction(vehicle_id, dr, dc, max_steps)
+        if steps <= 0:
+            return
+        signed_steps = steps * (dr + dc)
+        distance_px = abs(signed_steps) * C.CELL_SIZE
+        duration_ms = max(
+            C.MOVE_MIN_DURATION_MS,
+            int(1000 * distance_px / C.MOVE_SPEED_PX_PER_SEC),
+        )
+        self._move_anim = MoveAnimation(
+            vehicle_id=vehicle_id,
+            distance=signed_steps,
+            elapsed_ms=0,
+            duration_ms=duration_ms,
         )
 
     def _screen_pos_to_cell(self, pos: tuple[int, int]) -> tuple[int, int] | None:
@@ -662,12 +665,8 @@ class Game:
 
     def _draw_vehicles(self) -> None:
         for v in self._state.vehicles:
-            if v.id in self._remove_cars:
-                continue
-            
             body = self._vehicle_draw_rect(v)
             pygame.draw.rect(self._screen, v.color, body, border_radius=8)
-                
             if v.is_target:
                 pygame.draw.rect(
                     self._screen,
@@ -684,17 +683,6 @@ class Game:
                     width=4,
                     border_radius=10,
                 )
-            if self._powerup_active:
-                # 小红车（目标车）不高亮，其他全部高亮
-                if not v.is_target:
-                    pygame.draw.rect(
-                    self._screen,
-                    C.COLOR_POWERUP,
-                    body.inflate(10, 10),
-                    width=5,
-                    border_radius=10,
-                )
-            
 
     def _draw_win_overlay(self) -> None:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
@@ -869,7 +857,6 @@ class Game:
             mouse,
             self._level_index,
             level_count(),
-            self._powerup_remain,
         )
         self._board.draw(self._screen, self._board_bg)
         self._draw_exit_portal()
