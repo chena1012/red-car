@@ -501,53 +501,49 @@ class Game:
         if v is None:
             return
 
-        # 方向锁定
+        # 方向锁定（完全正确）
         if v.horizontal:
-            dr = 0
+            dr = 0  # 横向车：只能左右
         else:
-            dc = 0
+            dc = 0  # 纵向车：只能上下
 
-        # 最多能移动几格（我们自己算，不使用自带函数）
-        max_possible_steps = max_steps if max_steps is not None else 999
         moved = 0
+        max_move = max_steps if max_steps is not None else 999
 
-        for _ in range(max_possible_steps):
-            # 假设再走一步
-            new_r = v.row + dr * (moved + 1)
-            new_c = v.col + dc * (moved + 1)
-            can_step = True
+        for _ in range(max_move):
+            next_r = v.row + dr * (moved + 1)
+            next_c = v.col + dc * (moved + 1)
+            safe = True
 
+            # 先收集这辆车要移动到的所有格子
+            cells = []
             for i in range(v.length):
-                r = new_r + (dr * i)
-                c = new_c + (dc * i)
+                r = next_r + (0 if v.horizontal else i)
+                c = next_c + (i if v.horizontal else 0)
+                cells.append((r, c))
 
-                # 出界判断
+            # 检查边界
+            for (r, c) in cells:
                 if r < 0 or r >= C.GRID_ROWS:
-                    can_step = False
-                    break
-                if not v.is_target and (c < 0 or c >= C.GRID_COLS):
-                    can_step = False
-                    break
-                if v.is_target and c < 0:
-                    can_step = False
-                    break
-                if v.is_target and c >= C.GRID_COLS and r != C.EXIT_ROW:
-                    can_step = False
-                    break
+                    safe = False
+                if c < 0:
+                    safe = False
+                if c >= C.GRID_COLS and not (v.is_target and r == C.EXIT_ROW):
+                    safe = False
 
-                # 碰撞判断（跳过被 powerup 删掉的车）
+            # 检查碰撞（独立检查！不会卡左移！）
+            if safe:
                 for other in self._state.vehicles:
-                    if other.id == v.id:
+                    if other.id == v.id or other.id in self._remove_cars:
                         continue
-                    if other.id in self._remove_cars:
-                        continue  # 👈 核心：被消除的车直接忽略
-                    if (r, c) in other.cells():
-                        can_step = False
+                    for (r, c) in cells:
+                        if (r, c) in other.cells():
+                            safe = False
+                            break
+                    if not safe:
                         break
-                if not can_step:
-                    break
 
-            if can_step:
+            if safe:
                 moved += 1
             else:
                 break
@@ -555,17 +551,16 @@ class Game:
         if moved <= 0:
             return
 
-        # 开启动画
-        signed = moved * (dr + dc)
-        dist_px = abs(signed) * C.CELL_SIZE
-        dur = max(C.MOVE_MIN_DURATION_MS, int(1000 * dist_px / C.MOVE_SPEED_PX_PER_SEC))
+        dist = moved * (dr + dc)
+        px = abs(dist) * C.CELL_SIZE
+        dur = max(C.MOVE_MIN_DURATION_MS, int(1000 * px / C.MOVE_SPEED_PX_PER_SEC))
 
         self._move_anim = MoveAnimation(
-        vehicle_id=vehicle_id,
-        distance=signed,
-        elapsed_ms=0,
-        duration_ms=dur
-    )
+            vehicle_id=vehicle_id,
+            distance=dist,
+            elapsed_ms=0,
+            duration_ms=dur
+        )
 
     def _screen_pos_to_cell(self, pos: tuple[int, int]) -> tuple[int, int] | None:
         x, y = pos
