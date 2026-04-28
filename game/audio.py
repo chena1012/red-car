@@ -2,6 +2,7 @@ import pygame
 import os
 from game import constants as C
 
+
 class AudioManager:
     def __init__(self):
         pygame.mixer.init()
@@ -65,5 +66,6 @@ class AudioManager:
     def play_win(self):
         if self.sfx_win:
             self.sfx_win.play()
+
 
 audio = AudioManager()

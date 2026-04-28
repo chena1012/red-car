@@ -176,11 +176,47 @@ class GameState:
             steps += 1
         return steps
 
+    def remove_vehicle(self, vehicle_id: str) -> bool:
+        """移除指定车辆；若不存在则返回 False。"""
+        for i, v in enumerate(self._vehicles):
+            if v.id == vehicle_id:
+                self._vehicles.pop(i)
+                return True
+        return False
+
     def export_positions(self) -> list[dict[str, int | str]]:
         """导出车辆位置快照，用于存档。"""
         return [{"id": v.id, "row": v.row, "col": v.col} for v in self._vehicles]
 
-    def apply_positions(self, positions: list[dict[str, int | str]]) -> bool:
+    def export_vehicles(self) -> list[dict[str, int | str | bool]]:
+        """导出完整车辆数据，用于存档。"""
+        return [{"id": v.id, "row": v.row, "col": v.col, "length": v.length, "horizontal": v.horizontal, "color": v.color, "is_target": v.is_target} for v in self._vehicles]
+
+    def apply_vehicles(self, vehicles_data: list[dict[str, int | str | bool]]) -> bool:
+        """从数据创建车辆；若数据非法则返回 False。"""
+        try:
+            vehicles = []
+            for item in vehicles_data:
+                vid = str(item["id"])
+                row = int(item["row"])
+                col = int(item["col"])
+                length = int(item["length"])
+                horizontal = bool(item["horizontal"])
+                color = tuple(item["color"]) if isinstance(
+                    item["color"], list) else item["color"]
+                is_target = bool(item["is_target"])
+                v = Vehicle(vid, row, col, length,
+                            horizontal, color, is_target)
+                vehicles.append(v)
+            self._vehicles = vehicles
+            if self.has_any_overlap():
+                return False
+            for v in self._vehicles:
+                if not self._all_cells_respect_board_rules(v):
+                    return False
+            return True
+        except (KeyError, TypeError, ValueError):
+            return False
         """按 id 恢复车辆位置；若数据非法则不改动并返回 False。"""
         by_id = {v.id: v for v in self._vehicles}
         if len(positions) != len(self._vehicles):

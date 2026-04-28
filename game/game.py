@@ -20,6 +20,8 @@ from .state import GameState
 from .vehicle import Vehicle
 
 audio.play_bgm()
+
+
 @dataclass
 class MoveAnimation:
     vehicle_id: str
@@ -45,7 +47,8 @@ class Game:
         pygame.init()
         pygame.display.set_caption("Little Red Car Game")
 
-        self._screen = pygame.display.set_mode((C.WINDOW_WIDTH, C.WINDOW_HEIGHT))
+        self._screen = pygame.display.set_mode(
+            (C.WINDOW_WIDTH, C.WINDOW_HEIGHT))
         self._clock = pygame.time.Clock()
 
         self._board_x = C.BOARD_MARGIN
@@ -56,6 +59,8 @@ class Game:
         self._state: GameState = load_game_state(self._level_index)
 
         self._selected_id: str | None = None
+        self._powerup_active = False
+        self._powerup_remain = 3
         self._steps = 0
         self._elapsed_ms = 0
         self._won = False
@@ -67,6 +72,8 @@ class Game:
         self._status_text = ""
         self._status_ms_left = 0
         self._save_manager = SaveManager()
+        self._total_powerup_used = 0
+        self._total_removed_vehicles = 0
         self._load_game_metadata()
         self._state_name = "MENU"
 
@@ -81,7 +88,8 @@ class Game:
         self._font_menu_btn = pygame.font.Font(None, 24)
 
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
-        self._menu = Menu(C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn)
+        self._menu = Menu(C.WINDOW_WIDTH, C.WINDOW_HEIGHT,
+                          self._font_menu_title, self._font_menu_btn)
         self._level_select = LevelSelect(
             C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn
         )
@@ -92,7 +100,7 @@ class Game:
         self._board_bg = pygame.image.load(C.BOARD_BG_PATH).convert()
         self._board_bg = pygame.transform.smoothscale(
             self._board_bg,
-       (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
+            (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
         )
 
         audio.play_bgm()
@@ -124,6 +132,8 @@ class Game:
         self._won = False
         self._selected_id = None
         self._move_anim = None
+        self._powerup_active = False
+        self._powerup_remain = 3
 
     def _reset_current_level(self) -> None:
         """Reset the current level layout."""
@@ -135,6 +145,8 @@ class Game:
         self._won = False
         self._selected_id = None
         self._move_anim = None
+        self._powerup_active = False
+        self._powerup_remain = 3
 
     def _set_status(self, text: str, duration_ms: int = 2200) -> None:
         self._status_text = text
@@ -148,7 +160,8 @@ class Game:
             "won": self._won,
             "unlocked_levels": self._unlocked_levels,
             "selected_id": self._selected_id,
-            "vehicles": self._state.export_positions(),
+            "powerup_remain": self._powerup_remain,
+            "vehicles": self._state.export_vehicles(),
             "best_steps_by_level": {
                 str(k): int(v) for k, v in self._best_steps_by_level.items()
             },
@@ -178,6 +191,8 @@ class Game:
             "best_stars_by_level": {
                 str(k): int(v) for k, v in self._best_stars_by_level.items()
             },
+            "total_powerup_used": self._total_powerup_used,
+            "total_removed_vehicles": self._total_removed_vehicles,
         }
         ok, _ = self._save_manager.save(payload)
         return ok
@@ -187,10 +202,11 @@ class Game:
         data, msg = self._save_manager.load()
         if data is None:
             return
-        
+
         n = level_count()
-        self._unlocked_levels = max(1, min(int(data.get("unlocked_levels", 1)), n))
-        
+        self._unlocked_levels = max(
+            1, min(int(data.get("unlocked_levels", 1)), n))
+
         # 加载最高分和星星
         raw_best = data.get("best_steps_by_level", {})
         if isinstance(raw_best, dict):
@@ -198,13 +214,17 @@ class Game:
                 ik, iv = int(k), int(v)
                 if 0 <= ik < n and iv >= 0:
                     self._best_steps_by_level[ik] = iv
-                    
+
         raw_stars = data.get("best_stars_by_level", {})
         if isinstance(raw_stars, dict):
             for k, v in raw_stars.items():
                 ik, iv = int(k), int(v)
                 if 0 <= ik < n and 0 <= iv <= 3:
                     self._best_stars_by_level[ik] = iv
+
+        self._total_powerup_used = int(data.get("total_powerup_used", 0))
+        self._total_removed_vehicles = int(
+            data.get("total_removed_vehicles", 0))
 
     def _load_game(self) -> None:
         if self._move_anim is not None:
@@ -229,9 +249,13 @@ class Game:
             if level_idx < 0 or level_idx >= unlocked:
                 return False
 
-            state = load_game_state(level_idx)
-            if not state.apply_positions(list(data["vehicles"])):
-                return False
+            # 如果有车辆数据，使用它创建状态，否则加载关卡
+            if "vehicles" in data:
+                state = GameState([])
+                if not state.apply_vehicles(list(data["vehicles"])):
+                    return False
+            else:
+                state = load_game_state(level_idx)
 
             self._unlocked_levels = unlocked
             self._level_index = level_idx
@@ -239,8 +263,10 @@ class Game:
             self._steps = max(0, int(data.get("steps", 0)))
             self._elapsed_ms = max(0, int(data.get("elapsed_ms", 0)))
             self._won = bool(data.get("won", False))
+            self._powerup_remain = max(0, int(data.get("powerup_remain", 3)))
             selected_id = data.get("selected_id")
-            self._selected_id = selected_id if isinstance(selected_id, str) else None
+            self._selected_id = selected_id if isinstance(
+                selected_id, str) else None
             if self._selected_id is not None and self._state.get_vehicle(self._selected_id) is None:
                 self._selected_id = None
             raw_best = data.get("best_steps_by_level", {})
@@ -313,7 +339,8 @@ class Game:
                     elif action == "exit":
                         return False
                 elif self._state_name == "LEVEL_SELECT":
-                    action = self._level_select.action_at(event.pos, self._unlocked_levels)
+                    action = self._level_select.action_at(
+                        event.pos, self._unlocked_levels)
                     if isinstance(action, tuple) and action[0] == "level":
                         self._state_name = "PLAYING"
                         self._load_level(action[1])
@@ -336,7 +363,7 @@ class Game:
                             self._move_anim = None
                     elif action == "exit_no_save":
                         self._save_without_progress()
-                        self._load_level(self._level_index) # 内存中也立即重置
+                        self._load_level(self._level_index)  # 内存中也立即重置
                         self._state_name = "LEVEL_SELECT"
                         self._selected_id = None
                         self._move_anim = None
@@ -374,9 +401,9 @@ class Game:
         if action == "powerup":
             if self._powerup_remain > 0:
                 self._powerup_active = True
-                self._selected_id = None  
+                self._selected_id = None
             return
-        
+
         cell = self._screen_pos_to_cell(pos)
         if cell is None:
             self._selected_id = None
@@ -390,12 +417,14 @@ class Game:
         if self._move_anim is not None:
             return
 
-        cell = self._screen_pos_to_cell(pos)
-        if cell is None:
-            self._selected_id = None
+        if self._powerup_active and v is not None and not v.is_target:
+            self._state.remove_vehicle(v.id)
+            self._powerup_active = False
+            self._powerup_remain -= 1   # 消耗一次
+            self._total_powerup_used += 1
+            self._total_removed_vehicles += 1
             return
-        row, col = cell
-        v = self._state.occupant_at(row, col)
+
         if v is not None:
             self._selected_id = v.id
             audio.play_select()
@@ -403,6 +432,8 @@ class Game:
 
         if self._selected_id is not None:
             self._try_click_move_to_cell(row, col)
+
+        self._selected_id = v.id if v else None
 
     def _on_key_down(self, key: int) -> None:
         if self._won or self._selected_id is None or self._move_anim is not None:
@@ -447,7 +478,8 @@ class Game:
                     self._best_steps_by_level[self._level_index] = self._steps
                 stars_total = self._get_win_stars().total
                 prev = self._best_stars_by_level.get(self._level_index, 0)
-                self._best_stars_by_level[self._level_index] = max(prev, stars_total)
+                self._best_stars_by_level[self._level_index] = max(
+                    prev, stars_total)
                 self._unlocked_levels = min(
                     level_count(), max(self._unlocked_levels, self._level_index + 2)
                 )
@@ -523,7 +555,7 @@ class Game:
             # 检查碰撞（独立检查！不会卡左移！）
             if safe:
                 for other in self._state.vehicles:
-                    if other.id == v.id or other.id in self._remove_cars:
+                    if other.id == v.id:
                         continue
                     for (r, c) in cells:
                         if (r, c) in other.cells():
@@ -540,16 +572,8 @@ class Game:
         if moved <= 0:
             return
 
-        dist = moved * (dr + dc)
-        px = abs(dist) * C.CELL_SIZE
-        dur = max(C.MOVE_MIN_DURATION_MS, int(1000 * px / C.MOVE_SPEED_PX_PER_SEC))
-
-        self._move_anim = MoveAnimation(
-            vehicle_id=vehicle_id,
-            distance=dist,
-            elapsed_ms=0,
-            duration_ms=dur
-        steps = self._state.max_steps_in_direction(vehicle_id, dr, dc, max_steps)
+        steps = self._state.max_steps_in_direction(
+            vehicle_id, dr, dc, max_steps)
         if steps <= 0:
             return
         signed_steps = steps * (dr + dc)
@@ -593,7 +617,7 @@ class Game:
         minutes = total_seconds // 60
         seconds = total_seconds % 60
         time_str = f"time: {minutes:02d}:{seconds:02d}"
-        
+
         # Draw time (left)
         time_surf = self._font_ui.render(time_str, True, C.COLOR_TITLE)
         time_rect = time_surf.get_rect(
@@ -602,15 +626,18 @@ class Game:
         self._screen.blit(time_surf, time_rect)
 
         # Draw steps (right)
-        steps_surf = self._font_ui.render(f"step: {self._steps}", True, C.COLOR_TITLE)
+        steps_surf = self._font_ui.render(
+            f"step: {self._steps}", True, C.COLOR_TITLE)
         steps_rect = steps_surf.get_rect(
             bottomright=(C.WINDOW_WIDTH - 16, C.WINDOW_HEIGHT - 12)
         )
         self._screen.blit(steps_surf, steps_rect)
         if self._status_text:
-            status_surf = self._font_ui.render(self._status_text, True, C.COLOR_TITLE)
+            status_surf = self._font_ui.render(
+                self._status_text, True, C.COLOR_TITLE)
             status_rect = status_surf.get_rect(
-                center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 12 - status_surf.get_height() // 2)
+                center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT -
+                        12 - status_surf.get_height() // 2)
             )
             self._screen.blit(status_surf, status_rect)
 
@@ -652,7 +679,8 @@ class Game:
         x0, y0 = self._board.topleft
         portal_x = x0 + C.BOARD_PIXEL_W
         portal_y = y0 + C.EXIT_ROW * C.CELL_SIZE
-        portal = pygame.Rect(portal_x, portal_y, C.EXIT_PORTAL_WIDTH, C.CELL_SIZE)
+        portal = pygame.Rect(portal_x, portal_y,
+                             C.EXIT_PORTAL_WIDTH, C.CELL_SIZE)
 
         pygame.draw.rect(self._screen, C.COLOR_EXIT_PORTAL, portal)
         pygame.draw.rect(self._screen, C.COLOR_EXIT_HIGHLIGHT, portal, 4)
@@ -661,12 +689,14 @@ class Game:
         tip = (portal_x + C.EXIT_PORTAL_WIDTH - 6, cy)
         left = (portal_x + 10, cy - 14)
         right = (portal_x + 10, cy + 14)
-        pygame.draw.polygon(self._screen, C.COLOR_EXIT_HIGHLIGHT, (tip, left, right))
+        pygame.draw.polygon(
+            self._screen, C.COLOR_EXIT_HIGHLIGHT, (tip, left, right))
 
     def _draw_vehicles(self) -> None:
         for v in self._state.vehicles:
             body = self._vehicle_draw_rect(v)
             pygame.draw.rect(self._screen, v.color, body, border_radius=8)
+
             if v.is_target:
                 pygame.draw.rect(
                     self._screen,
@@ -683,6 +713,16 @@ class Game:
                     width=4,
                     border_radius=10,
                 )
+            if self._powerup_active:
+                # 小红车（目标车）不高亮，其他全部高亮
+                if not v.is_target:
+                    pygame.draw.rect(
+                        self._screen,
+                        C.COLOR_POWERUP,
+                        body.inflate(10, 10),
+                        width=5,
+                        border_radius=10,
+                    )
 
     def _draw_win_overlay(self) -> None:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
@@ -696,7 +736,8 @@ class Game:
         total_seconds = self._elapsed_ms // 1000
         minutes = total_seconds // 60
         seconds = total_seconds % 60
-        step_surf = self._font_ui.render(f"step: {self._steps}", True, C.COLOR_WIN_TEXT)
+        step_surf = self._font_ui.render(
+            f"step: {self._steps}", True, C.COLOR_WIN_TEXT)
         time_surf = self._font_ui.render(
             f"time: {minutes:02d}:{seconds:02d}", True, C.COLOR_WIN_TEXT
         )
@@ -709,7 +750,8 @@ class Game:
         best_steps_str = (
             f"best step: {best_steps}" if best_steps is not None else "best step: -"
         )
-        best_steps_surf = self._font_ui.render(best_steps_str, True, C.COLOR_WIN_TEXT)
+        best_steps_surf = self._font_ui.render(
+            best_steps_str, True, C.COLOR_WIN_TEXT)
         score_surf = self._font_ui.render(
             f"score: {stars.total}/3 stars", True, C.COLOR_WIN_TEXT
         )
@@ -770,7 +812,8 @@ class Game:
 
         panel = pygame.Rect(0, 0, panel_w, panel_h)
         panel.center = (C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT // 2)
-        pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL, panel, border_radius=12)
+        pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL,
+                         panel, border_radius=12)
         pygame.draw.rect(
             self._screen, C.COLOR_EXIT_HIGHLIGHT, panel, width=3, border_radius=12
         )
@@ -787,15 +830,18 @@ class Game:
 
         r_step = step_surf.get_rect(centerx=panel.centerx, top=r1.bottom + 64)
         self._screen.blit(step_surf, r_step)
-        r_time = time_surf.get_rect(centerx=panel.centerx, top=r_step.bottom + 6)
+        r_time = time_surf.get_rect(
+            centerx=panel.centerx, top=r_step.bottom + 6)
         self._screen.blit(time_surf, r_time)
         r_time_target = time_target_surf.get_rect(
             centerx=panel.centerx, top=r_time.bottom + 8
         )
         self._screen.blit(time_target_surf, r_time_target)
-        r_best = best_steps_surf.get_rect(centerx=panel.centerx, top=r_time_target.bottom + 8)
+        r_best = best_steps_surf.get_rect(
+            centerx=panel.centerx, top=r_time_target.bottom + 8)
         self._screen.blit(best_steps_surf, r_best)
-        r_score = score_surf.get_rect(centerx=panel.centerx, top=r_best.bottom + 8)
+        r_score = score_surf.get_rect(
+            centerx=panel.centerx, top=r_best.bottom + 8)
         self._screen.blit(score_surf, r_score)
 
         if line2 is not None:
@@ -820,14 +866,17 @@ class Game:
         for i in range(10):
             angle = -pi / 2 + i * pi / 5
             radius = outer_radius if i % 2 == 0 else inner_radius
-            points.append((round(cx + radius * cos(angle)), round(cy + radius * sin(angle))))
+            points.append((round(cx + radius * cos(angle)),
+                          round(cy + radius * sin(angle))))
 
         if is_on:
             pygame.draw.polygon(self._screen, C.COLOR_STAR_ON, points)
-            pygame.draw.polygon(self._screen, C.COLOR_EXIT_HIGHLIGHT, points, 2)
+            pygame.draw.polygon(
+                self._screen, C.COLOR_EXIT_HIGHLIGHT, points, 2)
         else:
             pygame.draw.polygon(self._screen, C.COLOR_STAR_OFF_FILL, points)
-            pygame.draw.polygon(self._screen, C.COLOR_STAR_OFF_BORDER, points, 2)
+            pygame.draw.polygon(
+                self._screen, C.COLOR_STAR_OFF_BORDER, points, 2)
 
     def _draw(self) -> None:
         if self._state_name == "MENU":
@@ -844,8 +893,10 @@ class Game:
                 stars_by_level=self._best_stars_by_level,
             )
             if self._status_text:
-                status_surf = self._font_ui.render(self._status_text, True, C.COLOR_TITLE)
-                status_rect = status_surf.get_rect(center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 22))
+                status_surf = self._font_ui.render(
+                    self._status_text, True, C.COLOR_TITLE)
+                status_rect = status_surf.get_rect(
+                    center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 22))
                 self._screen.blit(status_surf, status_rect)
             return
 
@@ -857,6 +908,7 @@ class Game:
             mouse,
             self._level_index,
             level_count(),
+            self._powerup_remain,
         )
         self._board.draw(self._screen, self._board_bg)
         self._draw_exit_portal()

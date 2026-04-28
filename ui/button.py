@@ -27,7 +27,8 @@ class Button:
     ) -> None:
         hovered = mouse_pos is not None and self.rect.collidepoint(mouse_pos)
         fill = C.COLOR_BUTTON_FILL_HOVER if hovered else C.COLOR_BUTTON_FILL
-        pygame.draw.rect(surface, fill, self.rect, border_radius=C.BUTTON_RADIUS)
+        pygame.draw.rect(surface, fill, self.rect,
+                         border_radius=C.BUTTON_RADIUS)
         pygame.draw.rect(
             surface,
             C.COLOR_BUTTON_BORDER,
