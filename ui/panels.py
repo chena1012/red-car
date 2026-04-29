@@ -54,7 +54,9 @@ class Menu:
         self._buttons.clear()
         for key, label in specs:
             rect = pygame.Rect(x, y, button_w, button_h)
-            self._buttons[key] = Button(rect, label, self._button_font)
+            my_font = pygame.font.Font(None, 40) 
+            self._buttons[key] = Button(rect, label, my_font,border_radius=60)
+            self._buttons[key].set_colors(fill=(255,170,140), hover=(249,207,119),border=(249,207,119))
             y += button_h + gap
 
     def draw(self, surface: pygame.Surface, mouse_pos: tuple[int, int] | None) -> None:
