@@ -93,7 +93,8 @@ class Game:
             "C:/Windows/Fonts/consolab.ttf",
             42
         )
-        self._font_hud_value = pygame.font.Font(None, 56)
+        self._font_hud_value = pygame.font.Font(
+            "C:/Windows/Fonts/consolab.ttf", 36)
 
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
         self._menu = Menu(
@@ -118,14 +119,17 @@ class Game:
             (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
         )
 
-        self._info_box_bg = pygame.image.load(C.INFO_BOX_BG_PATH).convert_alpha()
+        self._info_box_bg = pygame.image.load(
+            C.INFO_BOX_BG_PATH).convert_alpha()
         self._info_box_bg = pygame.transform.smoothscale(
             self._info_box_bg,
             (C.INFO_BOX_WIDTH, C.INFO_BOX_HEIGHT)
         )
 
-        self._block_image_files: dict[int, list[str]] = self._load_block_image_files()
-        self._block_image_cache: dict[tuple[int, bool, tuple[int, int], str], pygame.Surface] = {}
+        self._block_image_files: dict[int, list[str]
+                                      ] = self._load_block_image_files()
+        self._block_image_cache: dict[tuple[int, bool,
+                                            tuple[int, int], str], pygame.Surface] = {}
 
         audio.play_bgm()
 
@@ -669,7 +673,8 @@ class Game:
         )
         self._screen.blit(step_label, step_label_rect)
 
-        step_value = self._font_hud_value.render(str(self._steps), True, C.COLOR_TITLE)
+        step_value = self._font_hud_value.render(
+            str(self._steps), True, C.COLOR_TITLE)
         step_value_rect = step_value.get_rect(
             center=(step_rect.centerx, step_rect.y + 82)
         )
@@ -786,7 +791,8 @@ class Game:
         }
 
         if not os.path.isdir(C.BOARD_TILES_DIR):
-            print(f"Warning: block image folder not found: {C.BOARD_TILES_DIR}")
+            print(
+                f"Warning: block image folder not found: {C.BOARD_TILES_DIR}")
             return files_by_length
 
         valid_exts = (".png", ".jpg", ".jpeg", ".webp")
@@ -985,7 +991,6 @@ class Game:
             )
             self._screen.blit(line2, r2)
 
-
     def _draw_star_row(
         self, center_x: int, top: int, stars_on: tuple[bool, bool, bool]
     ) -> None:
@@ -1013,7 +1018,6 @@ class Game:
             pygame.draw.polygon(self._screen, C.COLOR_STAR_OFF_FILL, points)
             pygame.draw.polygon(
                 self._screen, C.COLOR_STAR_OFF_BORDER, points, 2)
-
 
     def _draw(self) -> None:
         mouse = pygame.mouse.get_pos()
