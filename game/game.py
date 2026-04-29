@@ -4,6 +4,7 @@ from __future__ import annotations
 from game.audio import audio
 
 import sys
+import os
 from dataclasses import dataclass
 from math import cos, pi, sin
 
@@ -86,10 +87,14 @@ class Game:
         self._font_menu_title = pygame.font.Font(None, 56)
         self._font_menu_title.set_bold(True)
         self._font_menu_btn = pygame.font.Font(None, 24)
+        self._font_hud_label = pygame.font.Font(None, 42)
+        self._font_hud_value = pygame.font.Font(None, 56)
 
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
-        self._menu = Menu(C.WINDOW_WIDTH, C.WINDOW_HEIGHT,
-                          self._font_menu_title, self._font_menu_btn)
+        self._menu = Menu(
+            C.WINDOW_WIDTH, C.WINDOW_HEIGHT,
+            self._font_menu_title, self._font_menu_btn
+        )
         self._level_select = LevelSelect(
             C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn
         )
@@ -97,11 +102,25 @@ class Game:
             C.WINDOW_WIDTH, C.WINDOW_HEIGHT, self._font_menu_title, self._font_menu_btn
         )
 
+        self._menu_bg = pygame.image.load(C.MENU_BG_PATH).convert()
+        self._menu_bg = pygame.transform.smoothscale(
+            self._menu_bg,
+            (C.WINDOW_WIDTH, C.WINDOW_HEIGHT)
+        )
         self._board_bg = pygame.image.load(C.BOARD_BG_PATH).convert()
         self._board_bg = pygame.transform.smoothscale(
             self._board_bg,
             (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
         )
+
+        self._info_box_bg = pygame.image.load(C.INFO_BOX_BG_PATH).convert_alpha()
+        self._info_box_bg = pygame.transform.smoothscale(
+            self._info_box_bg,
+            (C.INFO_BOX_WIDTH, C.INFO_BOX_HEIGHT)
+        )
+
+        self._block_image_files: dict[int, list[str]] = self._load_block_image_files()
+        self._block_image_cache: dict[tuple[int, bool, tuple[int, int], str], pygame.Surface] = {}
 
         audio.play_bgm()
 
@@ -616,22 +635,41 @@ class Game:
         total_seconds = self._elapsed_ms // 1000
         minutes = total_seconds // 60
         seconds = total_seconds % 60
-        time_str = f"time: {minutes:02d}:{seconds:02d}"
+        time_str = f"{minutes:02d}:{seconds:02d}"
 
-        # Draw time (left)
-        time_surf = self._font_ui.render(time_str, True, C.COLOR_TITLE)
-        time_rect = time_surf.get_rect(
-            bottomleft=(16, C.WINDOW_HEIGHT - 12)
-        )
-        self._screen.blit(time_surf, time_rect)
+        time_rect = pygame.Rect(C.TIME_BOX_RECT)
+        step_rect = pygame.Rect(C.STEP_BOX_RECT)
 
-        # Draw steps (right)
-        steps_surf = self._font_ui.render(
-            f"step: {self._steps}", True, C.COLOR_TITLE)
-        steps_rect = steps_surf.get_rect(
-            bottomright=(C.WINDOW_WIDTH - 16, C.WINDOW_HEIGHT - 12)
+        # Draw Time box background image
+        self._screen.blit(self._info_box_bg, time_rect.topleft)
+
+        time_label = self._font_hud_label.render("Time", True, C.COLOR_TITLE)
+        time_label_rect = time_label.get_rect(
+            center=(time_rect.centerx, time_rect.y + 38)
         )
-        self._screen.blit(steps_surf, steps_rect)
+        self._screen.blit(time_label, time_label_rect)
+
+        time_value = self._font_hud_value.render(time_str, True, C.COLOR_TITLE)
+        time_value_rect = time_value.get_rect(
+            center=(time_rect.centerx, time_rect.y + 82)
+        )
+        self._screen.blit(time_value, time_value_rect)
+
+        # Draw Step box background image
+        self._screen.blit(self._info_box_bg, step_rect.topleft)
+
+        step_label = self._font_hud_label.render("Step", True, C.COLOR_TITLE)
+        step_label_rect = step_label.get_rect(
+            center=(step_rect.centerx, step_rect.y + 38)
+        )
+        self._screen.blit(step_label, step_label_rect)
+
+        step_value = self._font_hud_value.render(str(self._steps), True, C.COLOR_TITLE)
+        step_value_rect = step_value.get_rect(
+            center=(step_rect.centerx, step_rect.y + 82)
+        )
+        self._screen.blit(step_value, step_value_rect)
+
         if self._status_text:
             status_surf = self._font_ui.render(
                 self._status_text, True, C.COLOR_TITLE)
@@ -695,7 +733,14 @@ class Game:
     def _draw_vehicles(self) -> None:
         for v in self._state.vehicles:
             body = self._vehicle_draw_rect(v)
-            pygame.draw.rect(self._screen, v.color, body, border_radius=8)
+
+            image = self._block_image_for_vehicle(v, body.size)
+
+            if image is None:
+                # Fallback to the original color block if the image cannot be loaded.
+                pygame.draw.rect(self._screen, v.color, body, border_radius=8)
+            else:
+                self._screen.blit(image, body.topleft)
 
             if v.is_target:
                 pygame.draw.rect(
@@ -705,6 +750,7 @@ class Game:
                     width=4,
                     border_radius=8,
                 )
+
             if self._selected_id is not None and v.id == self._selected_id:
                 pygame.draw.rect(
                     self._screen,
@@ -723,6 +769,86 @@ class Game:
                         width=5,
                         border_radius=10,
                     )
+
+    def _load_block_image_files(self) -> dict[int, list[str]]:
+        """Load grass block images from the board_tiles folder automatically."""
+        files_by_length = {
+            2: [],
+            3: [],
+        }
+
+        if not os.path.isdir(C.BOARD_TILES_DIR):
+            print(f"Warning: block image folder not found: {C.BOARD_TILES_DIR}")
+            return files_by_length
+
+        valid_exts = (".png", ".jpg", ".jpeg", ".webp")
+
+        for filename in os.listdir(C.BOARD_TILES_DIR):
+            lower_name = filename.lower()
+
+            if not lower_name.endswith(valid_exts):
+                continue
+
+            # Reserve the target image for the red car only.
+            if lower_name == C.TARGET_BLOCK_IMAGE.lower():
+                continue
+
+            # Filenames containing "_L" are used for 3-cell long blocks.
+            if "_l" in lower_name:
+                files_by_length[3].append(filename)
+            else:
+                files_by_length[2].append(filename)
+
+        files_by_length[2].sort()
+        files_by_length[3].sort()
+
+        return files_by_length
+
+    def _block_image_name(self, vehicle: Vehicle) -> str:
+        """Choose a block image based on the vehicle type, length, and id."""
+        if vehicle.is_target:
+            return C.TARGET_BLOCK_IMAGE
+
+        names = self._block_image_files.get(vehicle.length, [])
+
+        if not names:
+            return ""
+
+        index = sum(ord(ch) for ch in vehicle.id) % len(names)
+        return names[index]
+
+    def _block_image_for_vehicle(
+            self,
+            vehicle: Vehicle,
+            size: tuple[int, int],
+    ) -> pygame.Surface | None:
+        """Load, rotate, resize, and cache the grass block image."""
+        image_name = self._block_image_name(vehicle)
+
+        if not image_name:
+            return None
+
+        key = (vehicle.length, vehicle.horizontal, size, image_name)
+
+        if key in self._block_image_cache:
+            return self._block_image_cache[key]
+
+        image_path = os.path.join(C.BOARD_TILES_DIR, image_name)
+
+        if not os.path.exists(image_path):
+            return None
+
+        image = pygame.image.load(image_path).convert_alpha()
+
+        # The provided images are horizontal.
+        # Rotate the image automatically when the vehicle is vertical.
+        if not vehicle.horizontal:
+            image = pygame.transform.rotate(image, 90)
+
+        image = pygame.transform.smoothscale(image, size)
+
+        self._block_image_cache[key] = image
+        return image
 
     def _draw_win_overlay(self) -> None:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
@@ -850,6 +976,7 @@ class Game:
             )
             self._screen.blit(line2, r2)
 
+
     def _draw_star_row(
         self, center_x: int, top: int, stars_on: tuple[bool, bool, bool]
     ) -> None:
@@ -878,9 +1005,12 @@ class Game:
             pygame.draw.polygon(
                 self._screen, C.COLOR_STAR_OFF_BORDER, points, 2)
 
+
     def _draw(self) -> None:
+        mouse = pygame.mouse.get_pos()
+
         if self._state_name == "MENU":
-            mouse = pygame.mouse.get_pos()
+            self._screen.blit(self._menu_bg, (0, 0))
             self._menu.draw(self._screen, mouse)
             return
         if self._state_name == "LEVEL_SELECT":
@@ -901,8 +1031,9 @@ class Game:
             return
 
         self._screen.fill(C.COLOR_BG)
+
         self._draw_title()
-        mouse = pygame.mouse.get_pos()
+
         self._control_bar.draw(
             self._screen,
             mouse,
@@ -910,12 +1041,20 @@ class Game:
             level_count(),
             self._powerup_remain,
         )
+
         self._board.draw(self._screen, self._board_bg)
         self._draw_exit_portal()
         self._draw_vehicles()
         self._draw_hud()
+
+        self._board.draw(self._screen, self._board_bg)
+        self._draw_exit_portal()
+        self._draw_vehicles()
+        self._draw_hud()
+
         if self._state_name == "PAUSED":
             self._pause_panel.draw(self._screen, mouse)
             return
+
         if self._won:
             self._draw_win_overlay()

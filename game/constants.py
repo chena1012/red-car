@@ -6,11 +6,20 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
 BOARD_BG_PATH = os.path.join(IMAGES_DIR, "board_bg.png")
+MENU_BG_PATH = os.path.join(IMAGES_DIR, "menu_bg.png")
+PLAY_BG_PATH = os.path.join(IMAGES_DIR, "play_bg.png")
+INFO_BOX_BG_PATH = os.path.join(IMAGES_DIR, "info_box_bg.png")
+BOARD_TILES_DIR = os.path.join(IMAGES_DIR, "board_tiles")
+TARGET_BLOCK_IMAGE = "target_car.jpg"
 
 # --- Board ---
 CELL_SIZE = 90  # Cell size in pixels
 GRID_ROWS = 6
 GRID_COLS = 6
+
+# --- Vehicle grass block ---
+BLOCK_IMAGE_PADDING = 0
+LONG_BLOCK_IMAGE_PADDING = 0
 
 # Classic Rush Hour: Exit on the right side of the board, middle row (index 2)
 EXIT_ROW = 2
@@ -21,6 +30,8 @@ EXIT_PORTAL_WIDTH = 56
 # --- Window Layout ---
 BOARD_MARGIN = 24
 BOTTOM_MARGIN = 24
+RIGHT_PANEL_GAP = 32
+RIGHT_PANEL_WIDTH = 300
 
 # Title bar + control buttons height
 TITLE_BAR_HEIGHT = 50
@@ -30,8 +41,38 @@ TOP_SECTION_HEIGHT = TITLE_BAR_HEIGHT + CONTROL_BAR_HEIGHT
 BOARD_PIXEL_W = GRID_COLS * CELL_SIZE
 BOARD_PIXEL_H = GRID_ROWS * CELL_SIZE
 
-WINDOW_WIDTH = BOARD_MARGIN + BOARD_PIXEL_W + EXIT_PORTAL_WIDTH + BOARD_MARGIN
+WINDOW_WIDTH = (
+    BOARD_MARGIN
+    + BOARD_PIXEL_W
+    + EXIT_PORTAL_WIDTH
+    + RIGHT_PANEL_GAP
+    + RIGHT_PANEL_WIDTH
+    + BOARD_MARGIN
+)
+
 WINDOW_HEIGHT = TOP_SECTION_HEIGHT + BOARD_PIXEL_H + BOTTOM_MARGIN
+
+# --- Right Info Panel ---
+RIGHT_PANEL_X = BOARD_MARGIN + BOARD_PIXEL_W + EXIT_PORTAL_WIDTH + RIGHT_PANEL_GAP
+RIGHT_PANEL_Y = TOP_SECTION_HEIGHT + 70
+
+INFO_BOX_WIDTH = RIGHT_PANEL_WIDTH
+INFO_BOX_HEIGHT = 160
+INFO_BOX_GAP = 35
+
+TIME_BOX_RECT = (
+    RIGHT_PANEL_X,
+    RIGHT_PANEL_Y,
+    INFO_BOX_WIDTH,
+    INFO_BOX_HEIGHT,
+)
+
+STEP_BOX_RECT = (
+    RIGHT_PANEL_X,
+    RIGHT_PANEL_Y + INFO_BOX_HEIGHT + INFO_BOX_GAP,
+    INFO_BOX_WIDTH,
+    INFO_BOX_HEIGHT,
+)
 
 FPS = 60
 
@@ -53,6 +94,9 @@ COLOR_WIN_PANEL = (51, 65, 85)
 COLOR_STAR_ON = (250, 204, 21)
 COLOR_STAR_OFF_FILL = (71, 85, 105)
 COLOR_STAR_OFF_BORDER = (148, 163, 184)
+
+COLOR_INFO_BOX_TEXT = (241, 245, 249)
+COLOR_INFO_BOX_LABEL = (203, 213, 225)
 
 # Buttons
 BUTTON_HEIGHT = 34
