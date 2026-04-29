@@ -91,36 +91,160 @@ class LevelSelect:
         self._level_buttons: list[tuple[int, Button]] = []
         self._back_button: Button | None = None
 
+        self._level_bg = self._load_scaled_image(
+            C.LEVEL_BG_PATH,
+            (self._screen_width, self._screen_height),
+            use_alpha=False,
+        )
+
+        self._level_button_img = self._load_scaled_image(
+            C.LEVEL_BUTTON_PATH,
+            (C.LEVEL_BUTTON_SIZE, C.LEVEL_BUTTON_SIZE),
+            use_alpha=True,
+        )
+
+    def _load_scaled_image(
+        self,
+        path: str,
+        size: tuple[int, int],
+        use_alpha: bool = True,
+    ) -> pygame.Surface | None:
+        """Load and scale an image. Return None if the asset is missing."""
+        try:
+            image = pygame.image.load(path)
+            image = image.convert_alpha() if use_alpha else image.convert()
+            return pygame.transform.smoothscale(image, size)
+        except pygame.error:
+            return None
+
     def _layout(self, level_total: int) -> None:
         self._level_buttons.clear()
-        cols = 4
-        button_w = 120
-        button_h = 72
-        gap_x = 18
-        gap_y = 18
-        rows = (level_total + cols - 1) // cols
-        total_w = cols * button_w + (cols - 1) * gap_x
-        total_h = rows * button_h + (rows - 1) * gap_y
-        start_x = (self._screen_width - total_w) // 2
-        start_y = self._screen_height // 2 - total_h // 2 + 30
+
+        button_size = C.LEVEL_BUTTON_SIZE
+        positions = C.LEVEL_BUTTON_POSITIONS
 
         for i in range(level_total):
-            row = i // cols
-            col = i % cols
-            x = start_x + col * (button_w + gap_x)
-            y = start_y + row * (button_h + gap_y)
+            if i < len(positions):
+                center_x, center_y = positions[i]
+            else:
+                # Fallback positions if more levels are added later.
+                extra = i - len(positions)
+                center_x = 220 + (extra % 4) * 190
+                center_y = 520 + (extra // 4) * 110
+
+            rect = pygame.Rect(0, 0, button_size, button_size)
+            rect.center = (center_x, center_y)
+
             self._level_buttons.append(
-                (i, Button((x, y, button_w, button_h),
-                 f"Level {i + 1}", self._button_font))
+                (i, Button(rect, f"Level {i + 1}", self._button_font))
             )
 
-        back_rect = pygame.Rect(
-            (self._screen_width - 200) // 2,
-            self._screen_height - 90,
-            200,
-            44,
+        self._back_button = Button(
+            pygame.Rect(C.LEVEL_BACK_BUTTON_RECT),
+            "Back",
+            self._button_font,
         )
-        self._back_button = Button(back_rect, "Back", self._button_font)
+
+    def _draw_text_with_shadow(
+        self,
+        surface: pygame.Surface,
+        text: str,
+        font: pygame.font.Font,
+        color: tuple[int, int, int],
+        center: tuple[int, int],
+    ) -> None:
+        """Draw readable text on top of the light paw image."""
+        shadow_surf = font.render(text, True, (255, 255, 255))
+        shadow_rect = shadow_surf.get_rect(center=(center[0] + 2, center[1] + 2))
+        surface.blit(shadow_surf, shadow_rect)
+
+        text_surf = font.render(text, True, color)
+        text_rect = text_surf.get_rect(center=center)
+        surface.blit(text_surf, text_rect)
+
+    def _draw_level_button(
+        self,
+        surface: pygame.Surface,
+        btn: Button,
+        level_index: int,
+        unlocked: bool,
+        stars: int,
+    ) -> None:
+        """Draw one paw-shaped level button without changing its click logic."""
+        if self._level_button_img is not None:
+            surface.blit(self._level_button_img, btn.rect.topleft)
+        else:
+            pygame.draw.rect(
+                surface,
+                C.COLOR_BUTTON_FILL,
+                btn.rect,
+                border_radius=C.BUTTON_RADIUS,
+            )
+            pygame.draw.rect(
+                surface,
+                C.COLOR_BUTTON_BORDER,
+                btn.rect,
+                width=2,
+                border_radius=C.BUTTON_RADIUS,
+            )
+
+        if unlocked:
+            title_text = f"Level {level_index + 1}"
+            text_color = (77, 60, 38)
+        else:
+            title_text = "LOCKED"
+            text_color = (95, 95, 95)
+
+        # Put both lines on the larger lower part of the paw.
+        self._draw_text_with_shadow(
+            surface,
+            title_text,
+            self._button_font,
+            text_color,
+            (btn.rect.centerx, btn.rect.centery + 18),
+        )
+
+        self._draw_text_with_shadow(
+            surface,
+            f"Stars: {stars}/3",
+            self._button_font,
+            text_color,
+            (btn.rect.centerx, btn.rect.centery + 44),
+        )
+
+    def _draw_back_button(
+            self,
+            surface: pygame.Surface,
+            mouse_pos: tuple[int, int] | None,
+    ) -> None:
+        """Draw the Back button with an orange style."""
+        if self._back_button is None:
+            return
+
+        hovered = mouse_pos is not None and self._back_button.contains(mouse_pos)
+
+        fill_color = (255, 173, 135) if not hovered else (255, 190, 150)
+        border_color = (255, 219, 128)
+        text_color = (255, 255, 255)
+
+        pygame.draw.rect(
+            surface,
+            fill_color,
+            self._back_button.rect,
+            border_radius=18,
+        )
+
+        pygame.draw.rect(
+            surface,
+            border_color,
+            self._back_button.rect,
+            width=3,
+            border_radius=18,
+        )
+
+        text_surf = self._button_font.render("Back", True, text_color)
+        text_rect = text_surf.get_rect(center=self._back_button.rect.center)
+        surface.blit(text_surf, text_rect)
 
     def draw(
         self,
@@ -131,32 +255,38 @@ class LevelSelect:
         stars_by_level: dict[int, int],
     ) -> None:
         self._layout(level_total)
-        surface.fill(C.COLOR_BG)
+
+        if self._level_bg is not None:
+            surface.blit(self._level_bg, (0, 0))
+        else:
+            surface.fill(C.COLOR_BG)
+
         title = self._title_font.render("Select Level", True, C.COLOR_TITLE)
+        title_shadow = self._title_font.render("Select Level", True, (82, 104, 64))
+
         title_rect = title.get_rect(
-            center=(self._screen_width // 2, self._screen_height // 4))
+            center=(self._screen_width // 2, 82)
+        )
+        shadow_rect = title_shadow.get_rect(
+            center=(self._screen_width // 2 + 3, 85)
+        )
+
+        surface.blit(title_shadow, shadow_rect)
         surface.blit(title, title_rect)
 
         for i, btn in self._level_buttons:
             unlocked = i < unlocked_count
-            btn.draw(surface, mouse_pos if unlocked else None)
             stars = max(0, min(3, int(stars_by_level.get(i, 0))))
-            stars_surf = self._button_font.render(
-                f"Stars: {stars}/3", True, C.COLOR_BUTTON_TEXT)
-            stars_rect = stars_surf.get_rect(
-                center=(btn.rect.centerx, btn.rect.bottom - 14))
-            surface.blit(stars_surf, stars_rect)
-            if not unlocked:
-                lock_surf = self._button_font.render(
-                    "LOCKED", True, C.COLOR_WIN_TEXT)
-                lock_rect = lock_surf.get_rect(center=btn.rect.center)
-                shade = pygame.Surface(btn.rect.size, pygame.SRCALPHA)
-                shade.fill((10, 12, 16, 170))
-                surface.blit(shade, btn.rect.topleft)
-                surface.blit(lock_surf, lock_rect)
 
-        if self._back_button is not None:
-            self._back_button.draw(surface, mouse_pos)
+            self._draw_level_button(
+                surface,
+                btn,
+                i,
+                unlocked,
+                stars,
+            )
+
+        self._draw_back_button(surface, mouse_pos)
 
     def action_at(
         self, pos: tuple[int, int], unlocked_count: int
@@ -167,9 +297,11 @@ class LevelSelect:
                     audio.play_click()
                     return ("level", i)
                 return "locked"
+
         if self._back_button is not None and self._back_button.contains(pos):
             audio.play_click()
             return "back"
+
         return None
 
 

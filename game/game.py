@@ -46,7 +46,7 @@ class Game:
     def __init__(self) -> None:
         self.audio = None
         pygame.init()
-        pygame.display.set_caption("Little Red Car Game")
+        pygame.display.set_caption("Pup Rescue: lawn block")
 
         self._screen = pygame.display.set_mode(
             (C.WINDOW_WIDTH, C.WINDOW_HEIGHT))
@@ -81,13 +81,18 @@ class Game:
         self._font_title = pygame.font.Font(None, 28)
         self._font_title.set_bold(True)
         self._font_ui = pygame.font.Font(None, 18)
+        self._status_font = pygame.font.Font(None, 32)
+        self._level_status_font = pygame.font.Font(None, 32)
         self._font_btn = pygame.font.Font(None, 17)
         self._font_win = pygame.font.Font(None, 48)
         self._font_win.set_bold(True)
         self._font_menu_title = pygame.font.Font(None, 56)
         self._font_menu_title.set_bold(True)
         self._font_menu_btn = pygame.font.Font(None, 24)
-        self._font_hud_label = pygame.font.Font(None, 42)
+        self._font_hud_label = pygame.font.Font(
+            "C:/Windows/Fonts/consolab.ttf",
+            42
+        )
         self._font_hud_value = pygame.font.Font(None, 56)
 
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
@@ -623,7 +628,7 @@ class Game:
 
     def _draw_title(self) -> None:
         text_surf = self._font_title.render(
-            "Little Red Car Game", True, C.COLOR_TITLE
+            "Pup Rescue: lawn block", True, C.COLOR_TITLE
         )
         text_rect = text_surf.get_rect(
             center=(C.WINDOW_WIDTH // 2, C.TITLE_BAR_HEIGHT // 2)
@@ -671,8 +676,11 @@ class Game:
         self._screen.blit(step_value, step_value_rect)
 
         if self._status_text:
-            status_surf = self._font_ui.render(
-                self._status_text, True, C.COLOR_TITLE)
+            status_surf = self._status_font.render(
+                self._status_text,
+                True,
+                (255, 255, 255)
+            )
             status_rect = status_surf.get_rect(
                 center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT -
                         12 - status_surf.get_height() // 2)
@@ -862,9 +870,10 @@ class Game:
         total_seconds = self._elapsed_ms // 1000
         minutes = total_seconds // 60
         seconds = total_seconds % 60
-        step_surf = self._font_ui.render(
+        step_surf = self._font_hud_label.render(
             f"step: {self._steps}", True, C.COLOR_WIN_TEXT)
-        time_surf = self._font_ui.render(
+
+        time_surf = self._font_hud_label.render(
             f"time: {minutes:02d}:{seconds:02d}", True, C.COLOR_WIN_TEXT
         )
         stars = self._get_win_stars()
@@ -1023,10 +1032,12 @@ class Game:
                 stars_by_level=self._best_stars_by_level,
             )
             if self._status_text:
-                status_surf = self._font_ui.render(
-                    self._status_text, True, C.COLOR_TITLE)
+                status_surf = self._level_status_font.render(
+                    self._status_text, True, (255, 255, 255)
+                )
                 status_rect = status_surf.get_rect(
-                    center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 22))
+                    center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 22)
+                )
                 self._screen.blit(status_surf, status_rect)
             return
 

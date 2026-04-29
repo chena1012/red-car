@@ -11,6 +11,8 @@ PLAY_BG_PATH = os.path.join(IMAGES_DIR, "play_bg.png")
 INFO_BOX_BG_PATH = os.path.join(IMAGES_DIR, "info_box_bg.png")
 BOARD_TILES_DIR = os.path.join(IMAGES_DIR, "board_tiles")
 TARGET_BLOCK_IMAGE = "target_car.jpg"
+LEVEL_BG_PATH = os.path.join(IMAGES_DIR, "level_bg.png")
+LEVEL_BUTTON_PATH = os.path.join(IMAGES_DIR, "level_button.png")
 
 # --- Board ---
 CELL_SIZE = 90  # Cell size in pixels
@@ -113,6 +115,18 @@ VEHICLE_INSET = 6
 # Movement animation
 MOVE_SPEED_PX_PER_SEC = 420
 MOVE_MIN_DURATION_MS = 120
+
+# --- Level Select Screen ---
+LEVEL_BUTTON_SIZE = 140
+
+LEVEL_BUTTON_POSITIONS = [
+    (220, 440),  # Level 1
+    (440, 245),  # Level 2
+    (675, 420),  # Level 3
+    (850, 250),  # Level 4
+]
+
+LEVEL_BACK_BUTTON_RECT = (388, 560, 200, 44)
 
 # --- Audio ---
 SOUNDS_DIR = os.path.join(ASSETS_DIR, "sounds")
