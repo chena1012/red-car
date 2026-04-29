@@ -23,6 +23,7 @@ class ControlBar:
             ("reset", "Reset"),
             ("prev", "Previous Level"),
             ("next", "Next Level"),
+            ("pause", "Pause"),
         ]
         y = C.TITLE_BAR_HEIGHT + (C.CONTROL_BAR_HEIGHT - C.BUTTON_HEIGHT) // 2
 
