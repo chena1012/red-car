@@ -188,9 +188,10 @@ class Game:
         self._powerup_active = False
         self._powerup_remain = 3
 
-    def _set_status(self, text: str, duration_ms: int = 2200) -> None:
+    def _set_status(self, text: str, duration_ms: int = 2200,color=C.COLOR_TITLE2) -> None:
         self._status_text = text
         self._status_ms_left = duration_ms
+        self._status_color = color
 
     def _build_save_payload(self) -> dict:
         return {
@@ -1050,7 +1051,7 @@ class Game:
             )
             if self._status_text:
                 status_surf = self._level_status_font.render(
-                    self._status_text, True, (255, 255, 255)
+                    self._status_text, True, self._status_color
                 )
                 status_rect = status_surf.get_rect(
                     center=(C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT - 22)
