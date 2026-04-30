@@ -119,10 +119,22 @@ class Game:
             (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
         )
 
-        self._info_box_bg = pygame.image.load(
-            C.INFO_BOX_BG_PATH).convert_alpha()
-        self._info_box_bg = pygame.transform.smoothscale(
-            self._info_box_bg,
+        self._game_bg = pygame.image.load(C.GAME_BG_PATH).convert()
+        self._game_bg = pygame.transform.smoothscale(
+            self._game_bg,
+            (C.WINDOW_WIDTH, C.WINDOW_HEIGHT)
+        )
+        self._info_box1_bg = pygame.image.load(
+            C.INFO_BOX1_BG_PATH).convert_alpha()
+        self._info_box1_bg = pygame.transform.smoothscale(
+            self._info_box1_bg,
+            (C.INFO_BOX_WIDTH, C.INFO_BOX_HEIGHT)
+        )
+
+        self._info_box2_bg = pygame.image.load(
+            C.INFO_BOX2_BG_PATH).convert_alpha()
+        self._info_box2_bg = pygame.transform.smoothscale(
+            self._info_box2_bg,
             (C.INFO_BOX_WIDTH, C.INFO_BOX_HEIGHT)
         )
 
@@ -632,7 +644,7 @@ class Game:
 
     def _draw_title(self) -> None:
         text_surf = self._font_title.render(
-            "Pup Rescue: lawn block", True, C.COLOR_TITLE
+            "Pup Rescue: lawn block", True, C.COLOR_TITLE2
         )
         text_rect = text_surf.get_rect(
             center=(C.WINDOW_WIDTH // 2, C.TITLE_BAR_HEIGHT // 2)
@@ -650,33 +662,33 @@ class Game:
         step_rect = pygame.Rect(C.STEP_BOX_RECT)
 
         # Draw Time box background image
-        self._screen.blit(self._info_box_bg, time_rect.topleft)
+        self._screen.blit(self._info_box1_bg, time_rect.topleft)
 
-        time_label = self._font_hud_label.render("Time", True, C.COLOR_TITLE)
+        time_label = self._font_hud_label.render("Time", True, C.COLOR_TITLE2)
         time_label_rect = time_label.get_rect(
-            center=(time_rect.centerx, time_rect.y + 38)
+            center=(time_rect.centerx+30, time_rect.y + 38)
         )
         self._screen.blit(time_label, time_label_rect)
 
-        time_value = self._font_hud_value.render(time_str, True, C.COLOR_TITLE)
+        time_value = self._font_hud_value.render(time_str, True, C.COLOR_TITLE1)
         time_value_rect = time_value.get_rect(
-            center=(time_rect.centerx, time_rect.y + 82)
+            center=(time_rect.centerx+30, time_rect.y + 75)
         )
         self._screen.blit(time_value, time_value_rect)
 
         # Draw Step box background image
-        self._screen.blit(self._info_box_bg, step_rect.topleft)
+        self._screen.blit(self._info_box2_bg, step_rect.topleft)
 
-        step_label = self._font_hud_label.render("Step", True, C.COLOR_TITLE)
+        step_label = self._font_hud_label.render("Step", True, C.COLOR_TITLE2)
         step_label_rect = step_label.get_rect(
-            center=(step_rect.centerx, step_rect.y + 38)
+            center=(step_rect.centerx+25, step_rect.y + 38)
         )
         self._screen.blit(step_label, step_label_rect)
 
         step_value = self._font_hud_value.render(
-            str(self._steps), True, C.COLOR_TITLE)
+            str(self._steps), True, C.COLOR_TITLE1)
         step_value_rect = step_value.get_rect(
-            center=(step_rect.centerx, step_rect.y + 82)
+            center=(step_rect.centerx+25, step_rect.y + 75)
         )
         self._screen.blit(step_value, step_value_rect)
 
@@ -1026,6 +1038,7 @@ class Game:
             self._screen.blit(self._menu_bg, (0, 0))
             self._menu.draw(self._screen, mouse)
             return
+        
         if self._state_name == "LEVEL_SELECT":
             mouse = pygame.mouse.get_pos()
             self._level_select.draw(
@@ -1045,28 +1058,24 @@ class Game:
                 self._screen.blit(status_surf, status_rect)
             return
 
-        self._screen.fill(C.COLOR_BG)
-
-        self._draw_title()
-
-        self._control_bar.draw(
-            self._screen,
-            mouse,
-            self._level_index,
-            level_count(),
-            self._powerup_remain,
-        )
-
-        self._board.draw(self._screen, self._board_bg)
-        self._draw_exit_portal()
-        self._draw_vehicles()
-        self._draw_hud()
-
-        self._board.draw(self._screen, self._board_bg)
-        self._draw_exit_portal()
-        self._draw_vehicles()
-        self._draw_hud()
-
+        
+        if self._state_name == "PLAYING":
+            self._screen.blit(self._game_bg, (0, 0))
+            self._board.draw(self._screen, self._board_bg)
+            self._draw_exit_portal()
+            self._draw_vehicles()
+            self._draw_hud()
+            self._draw_title()
+            self._control_bar.draw(
+                self._screen,
+                mouse,
+                self._level_index,
+                level_count(),
+                self._powerup_remain,
+            )
+        
+        
+    
         if self._state_name == "PAUSED":
             self._pause_panel.draw(self._screen, mouse)
             return
