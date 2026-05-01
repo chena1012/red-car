@@ -54,6 +54,25 @@ class MoveAnimation:
     duration_ms: int
 
 
+@dataclass
+class ShakeAnimation:
+    vehicle_id: str
+    dr: int
+    dc: int
+    elapsed_ms: int
+    duration_ms: int
+
+
+@dataclass
+class UndoState:
+    vehicles_data: list[dict]
+    steps: int
+    remaining_steps: int
+    powerup_remain: int
+    total_powerup_used: int
+    total_removed_vehicles: int
+
+
 @dataclass(frozen=True)
 class WinStars:
     clear: bool
@@ -105,6 +124,8 @@ class Game:
         self._total_powerup_used = 0
         self._total_removed_vehicles = 0
         self._challenge_clears: dict[str, bool] = {}
+        self._shake_anim: ShakeAnimation | None = None
+        self._undo_stack: list[UndoState] = []
         self._load_game_metadata()
         self._state_name = "MENU"
 
@@ -209,6 +230,7 @@ class Game:
         self._move_anim = None
         self._powerup_active = False
         self._powerup_remain = 3
+        self._undo_stack.clear()
         self._initialize_mode_limits()
 
     def _reset_current_level(self) -> None:
@@ -224,6 +246,8 @@ class Game:
         self._move_anim = None
         self._powerup_active = False
         self._powerup_remain = 3
+        self._result_buttons.clear()
+        self._undo_stack.clear()
         self._initialize_mode_limits()
 
     def _set_status(self, text: str, duration_ms: int = 2200, color=C.COLOR_TITLE2) -> None:
@@ -548,12 +572,16 @@ class Game:
         if self._mode == C.MODE_LIMITED_TIME:
             if self._remaining_time_ms <= 0:
                 self._failed = True
+                self._result_buttons.clear()
                 self._set_status("Time Up! Press Reset to try again.")
+                audio.play_fail()
 
         if self._mode == C.MODE_LIMITED_STEP:
             if self._remaining_steps <= 0 and not self._won:
                 self._failed = True
+                self._result_buttons.clear()
                 self._set_status("No Steps Left! Press Reset to try again.")
+                audio.play_fail()
 
     def _go_next_level(self) -> None:
         if self._level_index + 1 >= self._unlocked_levels:
@@ -566,6 +594,24 @@ class Game:
             self._set_status("Already at the first level.")
             return
         self._load_level(self._level_index - 1)
+
+    def _result_go_previous_level(self) -> None:
+        """从结果面板跳转到上一关，清理胜利/失败状态。"""
+        self._won = False
+        self._failed = False
+        self._selected_id = None
+        self._move_anim = None
+        self._powerup_active = False
+        self._go_previous_level()
+
+    def _result_go_next_level(self) -> None:
+        """从结果面板跳转到下一关，清理胜利/失败状态。"""
+        self._won = False
+        self._failed = False
+        self._selected_id = None
+        self._move_anim = None
+        self._powerup_active = False
+        self._go_next_level()
 
     def _try_restore_save_for(self, level_index: int, mode: str) -> None:
         """尝试从存档中恢复特定关卡和模式的即时进度。"""
@@ -641,8 +687,51 @@ class Game:
                     self._state_name = "PLAYING"
         return True
 
+    def _ensure_result_buttons(self) -> None:
+        """Ensure result overlay buttons exist before handling click events."""
+        if self._result_buttons:
+            return
+
+        if self._won:
+            if self._mode == C.MODE_NORMAL:
+                button_specs = [
+                    ("prev", "Prev"),
+                    ("reset", "Reset"),
+                    ("next", "Next"),
+                    ("exit", "Exit"),
+                ]
+            else:
+                button_specs = [
+                    ("reset", "Reset"),
+                    ("exit", "Exit"),
+                ]
+        elif self._failed:
+            button_specs = [
+                ("reset", "Reset"),
+                ("exit", "Exit"),
+            ]
+        else:
+            return
+
+        btn_w = 110
+        btn_h = 40
+        gap = 10
+        total_btns_w = len(button_specs) * btn_w + (len(button_specs) - 1) * gap
+
+        start_x = C.WINDOW_WIDTH // 2 - total_btns_w // 2
+        y_btns = C.WINDOW_HEIGHT // 2 + 115
+
+        for i, (key, label) in enumerate(button_specs):
+            bx = start_x + i * (btn_w + gap)
+            self._result_buttons[key] = Button(
+                (bx, y_btns, btn_w, btn_h),
+                label,
+                self._font_btn,
+            )
+
     def _on_mouse_down(self, pos: tuple[int, int]) -> None:
         if self._won or self._failed:
+            self._ensure_result_buttons()
             for key, btn in self._result_buttons.items():
                 if btn.contains(pos):
                     audio.play_click()
@@ -654,11 +743,21 @@ class Game:
                         self._move_anim = None
                         self._won = False
                         self._failed = False
+                        self._result_buttons.clear()
+                    elif key == "prev":
+                        self._result_go_previous_level()
+                    elif key == "next":
+                        self._result_go_next_level()
                     return
+            # 胜利或失败状态下，如果没点中面板按钮，直接拦截所有点击
+            return
 
         action = self._control_bar.action_at(pos)
         if action == "reset":
             self._reset_current_level()
+            return
+        if action == "undo":
+            self._undo()
             return
         if action == "next":
             self._go_next_level()
@@ -710,11 +809,13 @@ class Game:
             return
 
         if self._powerup_active and v is not None and not v.is_target:
+            self._push_undo() # 在移除车辆前记录状态
             self._state.remove_vehicle(v.id)
             self._powerup_active = False
             self._powerup_remain -= 1   # 消耗一次
             self._total_powerup_used += 1
             self._total_removed_vehicles += 1
+            audio.play_remove()
             return
 
         if v is not None:
@@ -740,6 +841,9 @@ class Game:
             dr = -1
         elif key == pygame.K_DOWN:
             dr = 1
+        elif key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            self._undo()
+            return
         else:
             return
 
@@ -755,6 +859,11 @@ class Game:
             self._remaining_time_ms = max(0, self._remaining_time_ms - dt)
 
         self._check_challenge_limits()
+
+        if self._shake_anim is not None:
+            self._shake_anim.elapsed_ms += dt
+            if self._shake_anim.elapsed_ms >= self._shake_anim.duration_ms:
+                self._shake_anim = None
 
         if self._move_anim is None:
             return
@@ -772,6 +881,7 @@ class Game:
             self._move_anim = None
             if self._state.is_won():
                 self._won = True
+                self._result_buttons.clear()
                 audio.play_win()
                 if self._mode == C.MODE_NORMAL:
                     if self._is_new_best_steps():
@@ -796,24 +906,37 @@ class Game:
             self._selected_id = None
             return
 
+        dr, dc = 0, 0
         if v.horizontal:
             if row != v.row:
+                self._show_invalid_move(v.id, 1 if row < v.row else -1, 0)
                 return
             left = v.col
             right = v.col + v.length - 1
             if col < left:
-                self._start_move_animation(v.id, 0, -1, max_steps=left - col)
+                dr, dc = 0, -1
+                max_steps = left - col
             elif col > right:
-                self._start_move_animation(v.id, 0, 1, max_steps=col - right)
+                dr, dc = 0, 1
+                max_steps = col - right
+            else:
+                return
         else:
             if col != v.col:
+                self._show_invalid_move(v.id, 0, 1 if col < v.col else -1)
                 return
             top = v.row
             bottom = v.row + v.length - 1
             if row < top:
-                self._start_move_animation(v.id, -1, 0, max_steps=top - row)
+                dr, dc = -1, 0
+                max_steps = top - row
             elif row > bottom:
-                self._start_move_animation(v.id, 1, 0, max_steps=row - bottom)
+                dr, dc = 1, 0
+                max_steps = row - bottom
+            else:
+                return
+
+        self._start_move_animation(v.id, dr, dc, max_steps=max_steps)
 
     def _start_move_animation(
         self, vehicle_id: str, dr: int, dc: int, max_steps: int | None = None
@@ -827,11 +950,22 @@ class Game:
         if v is None:
             return
 
+        dr_orig, dc_orig = dr, dc
+
         # 方向锁定（完全正确）
         if v.horizontal:
             dr = 0  # 横向车：只能左右
+            if dc_orig == 0 and dr_orig != 0: # 如果是横向车却尝试上下移动
+                self._show_invalid_move(vehicle_id, dr_orig, dc_orig)
+                return
+            dr = 0
+            dc = dc_orig
         else:
-            dc = 0  # 纵向车：只能上下
+            if dc_orig != 0 or dr_orig not in (-1, 1):
+                self._show_invalid_move(vehicle_id, dr_orig, dc_orig)
+                return
+            dr = dr_orig
+            dc = 0
 
         moved = 0
         max_move = max_steps if max_steps is not None else 999
@@ -875,7 +1009,11 @@ class Game:
                 break
 
         if moved <= 0:
+            self._show_invalid_move(vehicle_id, dr, dc)
             return
+
+        # 在执行合法移动前，记录撤销状态
+        self._push_undo()
 
         steps = self._state.max_steps_in_direction(
             vehicle_id, dr, dc, max_steps)
@@ -979,6 +1117,47 @@ class Game:
             center=(step_rect.centerx + 25, step_rect.y + 75))
         self._screen.blit(step_val_surf, step_val_rect)
 
+    def _show_invalid_move(self, vehicle_id: str | None = None, dr: int = 0, dc: int = 0) -> None:
+        audio.play_error()
+        if vehicle_id is not None and self._move_anim is None:
+            self._shake_anim = ShakeAnimation(
+                vehicle_id=vehicle_id,
+                dr=dr,
+                dc=dc,
+                elapsed_ms=0,
+                duration_ms=220,
+            )
+
+    def _push_undo(self) -> None:
+        """记录当前状态到撤销栈。"""
+        state = UndoState(
+            vehicles_data=self._state.export_vehicles(),
+            steps=self._steps,
+            remaining_steps=self._remaining_steps,
+            powerup_remain=self._powerup_remain,
+            total_powerup_used=self._total_powerup_used,
+            total_removed_vehicles=self._total_removed_vehicles
+        )
+        self._undo_stack.append(state)
+        # 限制撤销步数，防止内存占用过大（可选，例如最近 50 步）
+        if len(self._undo_stack) > 50:
+            self._undo_stack.pop(0)
+
+    def _undo(self) -> None:
+        """执行撤销操作。"""
+        if not self._undo_stack or self._move_anim is not None or self._won or self._failed:
+            return
+
+        state = self._undo_stack.pop()
+        self._state.apply_vehicles(state.vehicles_data)
+        self._steps = state.steps
+        self._remaining_steps = state.remaining_steps
+        self._powerup_remain = state.powerup_remain
+        self._total_powerup_used = state.total_powerup_used
+        self._total_removed_vehicles = state.total_removed_vehicles
+        
+        audio.play_undo()
+
     def _cell_rect_pixels(self, row: int, col: int) -> pygame.Rect:
         x0, y0 = self._board.topleft
         return pygame.Rect(
@@ -1033,6 +1212,14 @@ class Game:
     def _draw_vehicles(self) -> None:
         for v in self._state.vehicles:
             body = self._vehicle_draw_rect(v)
+
+            # Apply shake offset if this vehicle is shaking
+            if self._shake_anim is not None and self._shake_anim.vehicle_id == v.id:
+                progress = self._shake_anim.elapsed_ms / self._shake_anim.duration_ms
+                # sin(progress * pi * 3) gives a back-and-forth shake effect
+                offset = sin(progress * pi * 3) * 8
+                body.x += self._shake_anim.dc * offset
+                body.y += self._shake_anim.dr * offset
 
             image = self._block_image_for_vehicle(v, body.size)
 
@@ -1153,6 +1340,7 @@ class Game:
 
     def _draw_win_overlay(self) -> None:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
+        
         w, h = self._screen.get_size()
         y0 = C.TOP_SECTION_HEIGHT
         overlay = pygame.Surface((w, h - y0), pygame.SRCALPHA)
@@ -1184,9 +1372,6 @@ class Game:
             )
             content_surfs.append(time_surf)
 
-        # Panel dimensions calculation
-        # ... (rest of the content_surfs list will be handled below)
-
         if is_normal:
             stars = self._get_win_stars()
             time_limit = self._time_star_limit_seconds(self._level_index)
@@ -1212,17 +1397,31 @@ class Game:
                 content_surfs.append(line2)
             else:
                 line2 = None
+            
+            button_specs = [
+                ("prev", "Prev"),
+                ("reset", "Reset"),
+                ("next", "Next"),
+                ("exit", "Exit"),
+            ]
         else:
             stars = None
             line2 = None
+            button_specs = [
+                ("reset", "Reset"),
+                ("exit", "Exit"),
+            ]
 
-        panel_content_width = max([s.get_width()
-                                  for s in content_surfs] + [240])
+        # Calculate layout
+        btn_w = 110
+        btn_h = 40
+        gap = 10
+        total_btns_w = len(button_specs) * btn_w + (len(button_specs) - 1) * gap
+        
+        panel_content_width = max([s.get_width() for s in content_surfs] + [total_btns_w, 240])
         panel_w = panel_content_width + 80
 
         # Calculate height based on content
-        btn_h = 40
-        gap = 10
         panel_h = 24 + line1.get_height() + 20  # Top part
 
         if is_normal:
@@ -1234,7 +1433,6 @@ class Game:
                 panel_h += line2.get_height() + 14
         else:
             panel_h += 20  # Small gap
-            # 修复：判断 time_surf 是否存在，不存在就用 0 代替
             step_h = step_surf.get_height() if step_surf else 0
             time_h = time_surf.get_height() if time_surf else 0
             panel_h += step_h + 10 + time_h + 20
@@ -1299,15 +1497,17 @@ class Game:
                 y = r_time.bottom + 20
 
         # Draw Buttons
-        btn_w = 100
-        x_reset = panel.centerx - btn_w - 10
-        x_exit = panel.centerx + 10
-        y_btns = panel.bottom - btn_h - 20
-
-        self._result_buttons["reset"] = Button(
-            (x_reset, y_btns, btn_w, btn_h), "Reset", self._font_btn)
-        self._result_buttons["exit"] = Button(
-            (x_exit, y_btns, btn_w, btn_h), "Exit", self._font_btn)
+        start_x = panel.centerx - total_btns_w // 2
+        y_btns = C.WINDOW_HEIGHT // 2 + 115
+        
+        if not self._result_buttons:
+            for i, (key, label) in enumerate(button_specs):
+                bx = start_x + i * (btn_w + gap)
+                self._result_buttons[key] = Button(
+                    (bx, y_btns, btn_w, btn_h),
+                    label,
+                    self._font_btn
+                )
 
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
@@ -1315,6 +1515,7 @@ class Game:
 
     def _draw_fail_overlay(self) -> None:
         """Translucent layer for failure state."""
+        
         w, h = self._screen.get_size()
         y0 = C.TOP_SECTION_HEIGHT
         overlay = pygame.Surface((w, h - y0), pygame.SRCALPHA)
@@ -1341,14 +1542,23 @@ class Game:
         footer_surf = self._font_ui.render(
             "Press Reset to try again.", True, C.COLOR_WIN_TEXT)
 
+        button_specs = [
+            ("reset", "Reset"),
+            ("exit", "Exit"),
+        ]
+
+        btn_w = 110
+        btn_h = 40
+        gap = 10
+        total_btns_w = len(button_specs) * btn_w + (len(button_specs) - 1) * gap
+
         panel_content_width = max(
-            [line1.get_width(), reason_surf.get_width(), footer_surf.get_width(), 240] +
+            [line1.get_width(), reason_surf.get_width(), footer_surf.get_width(), 240, total_btns_w] +
             [s.get_width() for s in stat_surfs]
         )
 
         panel_w = panel_content_width + 80
-        btn_h = 40
-
+        
         stats_height = sum(s.get_height() for s in stat_surfs) + \
             (len(stat_surfs) - 1) * 6 if stat_surfs else 0
 
@@ -1399,15 +1609,17 @@ class Game:
         self._screen.blit(footer_surf, r_footer)
 
         # Draw Buttons
-        btn_w = 100
-        x_reset = panel.centerx - btn_w - 10
-        x_exit = panel.centerx + 10
-        y_btns = panel.bottom - btn_h - 24
-
-        self._result_buttons["reset"] = Button(
-            (x_reset, y_btns, btn_w, btn_h), "Reset", self._font_btn)
-        self._result_buttons["exit"] = Button(
-            (x_exit, y_btns, btn_w, btn_h), "Exit", self._font_btn)
+        start_x = panel.centerx - total_btns_w // 2
+        y_btns = C.WINDOW_HEIGHT // 2 + 115
+        
+        if not self._result_buttons:
+            for i, (key, label) in enumerate(button_specs):
+                bx = start_x + i * (btn_w + gap)
+                self._result_buttons[key] = Button(
+                    (bx, y_btns, btn_w, btn_h),
+                    label,
+                    self._font_btn
+                )
 
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
@@ -1444,16 +1656,20 @@ class Game:
     def _draw(self) -> None:
         mouse = pygame.mouse.get_pos()
 
+        # 当弹出暂停、胜利或失败面板时，背景按钮（控制栏等）应当不响应鼠标悬停
+        bg_mouse = mouse
+        if self._state_name == "PAUSED" or self._won or self._failed:
+            bg_mouse = None
+
         if self._state_name == "MENU":
             self._screen.blit(self._menu_bg, (0, 0))
-            self._menu.draw(self._screen, mouse)
+            self._menu.draw(self._screen, bg_mouse)
             return
 
         if self._state_name == "LEVEL_SELECT":
-            mouse = pygame.mouse.get_pos()
             self._level_select.draw(
                 self._screen,
-                mouse,
+                bg_mouse,
                 level_total=level_count(),
                 unlocked_count=self._unlocked_levels,
                 stars_by_level=self._best_stars_by_level,
@@ -1470,7 +1686,7 @@ class Game:
             self._draw_title()
             self._control_bar.draw(
                 self._screen,
-                mouse,
+                bg_mouse,
                 self._level_index,
                 level_count(),
                 self._powerup_remain

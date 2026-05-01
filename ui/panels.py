@@ -71,7 +71,6 @@ class Menu:
     def action_at(self, pos: tuple[int, int]) -> str | None:
         for key, btn in self._buttons.items():
             if btn.contains(pos):
-                from game.audio import audio
                 audio.play_click()
                 return key
         return None

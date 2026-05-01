@@ -23,7 +23,8 @@ class ControlBar:
     def _layout(self) -> None:
         specs = [
             ("hint", "Hint"),
-            ("powerup", "Power Up"),
+            ("undo", "Undo"),
+            ("powerup", "Remove"),
             ("reset", "Reset"),
             ("prev", "Previous Level"),
             ("next", "Next Level"),
@@ -32,7 +33,11 @@ class ControlBar:
 
         y = C.TITLE_BAR_HEIGHT + (C.CONTROL_BAR_HEIGHT - C.BUTTON_HEIGHT) // 2
 
-        normal_specs = specs[3:]
+        normal_specs = [
+            ("prev", "Previous Level"),
+            ("next", "Next Level"),
+            ("pause", "Pause"),
+        ]
 
         # Make the top three buttons slightly larger.
         top_button_h = 46
@@ -68,10 +73,16 @@ class ControlBar:
             "Hint",
             self._font,
         )
+        
+        self._buttons["undo"] = Button(
+            pygame.Rect(625, bottom_y - 70, big_w, big_h),
+            "Undo",
+            self._font,
+        )
 
         self._buttons["powerup"] = Button(
             pygame.Rect(625, bottom_y, big_w, big_h),
-            "Power Up",
+            "Remove",
             self._font,
         )
 
@@ -98,9 +109,9 @@ class ControlBar:
 
         # Define buttons to draw based on mode
         if mode == C.MODE_NORMAL:
-            draw_keys = ("prev", "next", "pause", "hint", "powerup", "reset")
+            draw_keys = ("prev", "next", "pause", "hint", "undo", "powerup", "reset")
         else:
-            draw_keys = ("pause", "hint", "powerup", "reset")
+            draw_keys = ("pause", "hint", "undo", "powerup", "reset")
 
         for key in draw_keys:
             btn = self._buttons[key]
@@ -125,6 +136,10 @@ class ControlBar:
             elif key == "hint":
                 self._draw_big_button(
                     surface, btn, mouse_pos, "Hint"
+                )
+            elif key == "undo":
+                self._draw_big_button(
+                    surface, btn, mouse_pos, "Undo"
                 )
             else:
                 btn.draw(surface, mouse_pos)
@@ -156,7 +171,7 @@ class ControlBar:
             surface,
             btn,
             mouse_pos,
-            f"Power Up ({remain}/3)",
+            f"Remove ({remain}/3)",
         )
 
     def action_at(self, pos: tuple[int, int], mode: str = C.MODE_NORMAL) -> str | None:

@@ -146,8 +146,12 @@ SOUNDS_DIR = os.path.join(ASSETS_DIR, "sounds")
 
 SFX_CLICK = os.path.join(SOUNDS_DIR, "click.wav")
 SFX_SELECT = os.path.join(SOUNDS_DIR, "select.wav")
+SFX_ERROR = os.path.join(SOUNDS_DIR, "error.wav")
+SFX_UNDO = os.path.join(SOUNDS_DIR, "undo.wav")
 SFX_MOVE = os.path.join(SOUNDS_DIR, "move.wav")
+SFX_REMOVE = os.path.join(SOUNDS_DIR, "remove.wav")
 SFX_WIN = os.path.join(SOUNDS_DIR, "win.wav")
+SFX_FAIL = os.path.join(SOUNDS_DIR, "fail.wav")
 BGM_PATH = os.path.join(SOUNDS_DIR, "bgm.mp3")
 
 # --- Volume Control (全局统一调节) ---
@@ -157,3 +161,4 @@ VOLUME_CLICK = 1.0
 VOLUME_SELECT = 0.9
 VOLUME_MOVE = 0.8
 VOLUME_WIN = 1.0
+VOLUME_FAIL = 1.0
