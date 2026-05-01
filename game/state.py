@@ -139,3 +139,109 @@ class GameState:
         v.row += dr
         v.col += dc
         return True
+
+    def max_steps_in_direction(
+        self, vehicle_id: str, dr: int, dc: int, max_steps: int | None = None
+    ) -> int:
+        """Return how many continuous steps the vehicle can move in a direction."""
+        v = self.get_vehicle(vehicle_id)
+        if v is None:
+            return 0
+
+        if v.horizontal:
+            if dr != 0 or dc not in (-1, 1):
+                return 0
+        else:
+            if dc != 0 or dr not in (-1, 1):
+                return 0
+
+        steps = 0
+        row, col = v.row, v.col
+        while max_steps is None or steps < max_steps:
+            trial = Vehicle(
+                v.id,
+                row + dr,
+                col + dc,
+                v.length,
+                v.horizontal,
+                v.color,
+                v.is_target,
+            )
+            if not self._all_cells_respect_board_rules(trial):
+                break
+            if self._has_overlap_on_board(trial, v.id):
+                break
+            row += dr
+            col += dc
+            steps += 1
+        return steps
+
+    def remove_vehicle(self, vehicle_id: str) -> bool:
+        """移除指定车辆；若不存在则返回 False。"""
+        for i, v in enumerate(self._vehicles):
+            if v.id == vehicle_id:
+                self._vehicles.pop(i)
+                return True
+        return False
+
+    def export_positions(self) -> list[dict[str, int | str]]:
+        """导出车辆位置快照，用于存档。"""
+        return [{"id": v.id, "row": v.row, "col": v.col} for v in self._vehicles]
+
+    def export_vehicles(self) -> list[dict[str, int | str | bool]]:
+        """导出完整车辆数据，用于存档。"""
+        return [{"id": v.id, "row": v.row, "col": v.col, "length": v.length, "horizontal": v.horizontal, "color": v.color, "is_target": v.is_target} for v in self._vehicles]
+
+    def apply_vehicles(self, vehicles_data: list[dict[str, int | str | bool]]) -> bool:
+        """从数据创建车辆；若数据非法则返回 False。"""
+        try:
+            vehicles = []
+            for item in vehicles_data:
+                vid = str(item["id"])
+                row = int(item["row"])
+                col = int(item["col"])
+                length = int(item["length"])
+                horizontal = bool(item["horizontal"])
+                color = tuple(item["color"]) if isinstance(
+                    item["color"], list) else item["color"]
+                is_target = bool(item["is_target"])
+                v = Vehicle(vid, row, col, length,
+                            horizontal, color, is_target)
+                vehicles.append(v)
+            self._vehicles = vehicles
+            if self.has_any_overlap():
+                return False
+            for v in self._vehicles:
+                if not self._all_cells_respect_board_rules(v):
+                    return False
+            return True
+        except (KeyError, TypeError, ValueError):
+            return False
+        """按 id 恢复车辆位置；若数据非法则不改动并返回 False。"""
+        by_id = {v.id: v for v in self._vehicles}
+        if len(positions) != len(self._vehicles):
+            return False
+
+        original = {v.id: (v.row, v.col) for v in self._vehicles}
+        seen: set[str] = set()
+        try:
+            for item in positions:
+                vid = str(item.get("id", ""))
+                if vid not in by_id or vid in seen:
+                    raise ValueError("invalid vehicle id")
+                row = int(item["row"])
+                col = int(item["col"])
+                by_id[vid].row = row
+                by_id[vid].col = col
+                seen.add(vid)
+            if self.has_any_overlap():
+                raise ValueError("overlap")
+            for v in self._vehicles:
+                if not self._all_cells_respect_board_rules(v):
+                    raise ValueError("out of board")
+        except (KeyError, TypeError, ValueError):
+            for v in self._vehicles:
+                old = original[v.id]
+                v.row, v.col = old
+            return False
+        return True
