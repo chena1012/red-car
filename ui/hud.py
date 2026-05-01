@@ -22,6 +22,7 @@ class ControlBar:
 
     def _layout(self) -> None:
         specs = [
+            ("hint", "Hint"),
             ("powerup", "Power Up"),
             ("reset", "Reset"),
             ("prev", "Previous Level"),
@@ -31,7 +32,7 @@ class ControlBar:
 
         y = C.TITLE_BAR_HEIGHT + (C.CONTROL_BAR_HEIGHT - C.BUTTON_HEIGHT) // 2
 
-        normal_specs = specs[2:]
+        normal_specs = specs[3:]
 
         # Make the top three buttons slightly larger.
         top_button_h = 46
@@ -56,22 +57,26 @@ class ControlBar:
             self._buttons[key] = Button(rect, label, self._top_font)
             x += bw + top_gap
 
-
-
-
-        # Move Power Up and Reset to the lower area, and make them larger.
-        big_w = 180
+        # Move Power Up, Reset and Hint to the lower area, and make them larger.
+        big_w = 160  # 稍微减小宽度以放下三个按钮
         big_h = 58
         bottom_y = C.WINDOW_HEIGHT - 90
 
+        # 调整 x 坐标，让三个按钮并排
+        self._buttons["hint"] = Button(
+            pygame.Rect(800, bottom_y - 70, big_w, big_h),
+            "Hint",
+            self._font,
+        )
+
         self._buttons["powerup"] = Button(
-            pygame.Rect(580, bottom_y, big_w, big_h),
+            pygame.Rect(625, bottom_y, big_w, big_h),
             "Power Up",
             self._font,
         )
 
         self._buttons["reset"] = Button(
-            pygame.Rect(790, bottom_y, big_w, big_h),
+            pygame.Rect(800, bottom_y, big_w, big_h),
             "Reset",
             self._font,
         )
@@ -93,17 +98,17 @@ class ControlBar:
 
         # Define buttons to draw based on mode
         if mode == C.MODE_NORMAL:
-            draw_keys = ("prev", "next", "pause", "powerup", "reset")
+            draw_keys = ("prev", "next", "pause", "hint", "powerup", "reset")
         else:
-            draw_keys = ("pause", "powerup", "reset")
+            draw_keys = ("pause", "hint", "powerup", "reset")
 
         for key in draw_keys:
             btn = self._buttons[key]
-            
+
             # For non-normal mode, we might want to shift the 'pause' button position
             # but let's first implement the hiding logic.
             if key == "pause" and mode != C.MODE_NORMAL:
-                # If in challenge mode, we can optionally move the pause button 
+                # If in challenge mode, we can optionally move the pause button
                 # to where 'next' or 'prev' was to keep it tidy, or just keep it there.
                 # The prompt suggests re-layout is optional but recommended.
                 # Let's keep it simple first.
@@ -116,6 +121,10 @@ class ControlBar:
             elif key == "reset":
                 self._draw_big_button(
                     surface, btn, mouse_pos, "Reset"
+                )
+            elif key == "hint":
+                self._draw_big_button(
+                    surface, btn, mouse_pos, "Hint"
                 )
             else:
                 btn.draw(surface, mouse_pos)

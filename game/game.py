@@ -20,6 +20,28 @@ from .levels import level_count, load_game_state
 from .save_manager import SaveManager
 from .state import GameState
 from .vehicle import Vehicle
+from .hint import RushHourHint
+
+audio.play_bgm()
+
+
+@dataclass
+class MoveAnimation:
+    vehicle_id: str
+    distance: int
+    elapsed_ms: int
+    duration_ms: int
+
+
+@dataclass(frozen=True)
+class WinStars:
+    clear: bool
+    time: bool
+    best_steps: bool
+
+    @property
+    def total(self) -> int:
+        return int(self.clear) + int(self.time) + int(self.best_steps)
 
 audio.play_bgm()
 
@@ -634,7 +656,7 @@ class Game:
                         self._failed = False
                     return
 
-        action = self._control_bar.action_at(pos, self._mode)
+        action = self._control_bar.action_at(pos)
         if action == "reset":
             self._reset_current_level()
             return
@@ -656,6 +678,19 @@ class Game:
                 else:
                     self._powerup_active = True
                     self._selected_id = None
+            return
+        
+        if action == "hint":
+            hint = RushHourHint.get_hint(self._state)
+            self._set_status(hint, duration_ms=3000)
+            audio.play_click()
+
+            # 自动高亮要移动的车
+            if "Move " in hint:
+                parts = hint.split()
+                if len(parts) >= 3:
+                    car_id = parts[1]
+                    self._selected_id = car_id
             return
 
         if self._failed or self._won:
@@ -1438,8 +1473,7 @@ class Game:
                 mouse,
                 self._level_index,
                 level_count(),
-                self._powerup_remain,
-                self._mode,
+                self._powerup_remain
             )
 
         if self._state_name == "PAUSED":
@@ -1450,3 +1484,8 @@ class Game:
             self._draw_win_overlay()
         elif self._failed:
             self._draw_fail_overlay()
+
+        if self._status_text and self._status_ms_left > 0:
+            surf = self._status_font.render(self._status_text, True, (0,0,0))
+            rect = surf.get_rect(center=(C.WINDOW_WIDTH//2, C.WINDOW_HEIGHT - 40))
+            self._screen.blit(surf, rect)
