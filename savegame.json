@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "level_index": -1,
+  "steps": 1,
+  "elapsed_ms": 3654,
+  "won": true,
+  "failed": false,
+  "mode": "NORMAL",
+  "time_limit_ms": 0,
+  "remaining_time_ms": 0,
+  "step_limit": 0,
+  "remaining_steps": 0,
+  "unlocked_levels": 4,
+  "selected_id": null,
+  "powerup_remain": 2,
+  "vehicles": [
+    {
+      "id": "R",
+      "row": 2,
+      "col": 4,
+      "length": 2,
+      "horizontal": true,
+      "color": [
+        220,
+        50,
+        47
+      ],
+      "is_target": true
+    },
+    {
+      "id": "A",
+      "row": 0,
+      "col": 0,
+      "length": 2,
+      "horizontal": false,
+      "color": [
+        38,
+        139,
+        210
+      ],
+      "is_target": false
+    },
+    {
+      "id": "C",
+      "row": 1,
+      "col": 4,
+      "length": 2,
+      "horizontal": true,
+      "color": [
+        181,
+        137,
+        0
+      ],
+      "is_target": false
+    },
+    {
+      "id": "D",
+      "row": 3,
+      "col": 0,
+      "length": 3,
+      "horizontal": false,
+      "color": [
+        108,
+        113,
+        196
+      ],
+      "is_target": false
+    },
+    {
+      "id": "E",
+      "row": 4,
+      "col": 2,
+      "length": 2,
+      "horizontal": true,
+      "color": [
+        42,
+        161,
+        152
+      ],
+      "is_target": false
+    },
+    {
+      "id": "F",
+      "row": 3,
+      "col": 5,
+      "length": 3,
+      "horizontal": false,
+      "color": [
+        203,
+        75,
+        22
+      ],
+      "is_target": false
+    }
+  ],
+  "best_steps_by_level": {
+    "0": 1,
+    "1": 20,
+    "2": 7,
+    "3": 4
+  },
+  "best_stars_by_level": {
+    "0": 3,
+    "1": 3,
+    "2": 3,
+    "3": 3
+  },
+  "total_powerup_used": 19,
+  "total_removed_vehicles": 19,
+  "challenge_clears": {}
+}
