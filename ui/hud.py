@@ -85,7 +85,7 @@ class ControlBar:
         powerup_remain: int,
     ) -> None:
         label = f"Level {level_index + 1}/{level_total}"
-        surf = self._font.render(label, True, C.COLOR_TITLE)
+        surf = self._font.render(label, True, C.COLOR_TITLE2)
         y_text = C.TITLE_BAR_HEIGHT + \
             (C.CONTROL_BAR_HEIGHT - surf.get_height()) // 2
         surface.blit(surf, (16, y_text))

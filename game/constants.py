@@ -15,6 +15,7 @@ TARGET_BLOCK_IMAGE = "target_car.jpg"
 LEVEL_BG_PATH = os.path.join(IMAGES_DIR, "level_bg.png")
 LEVEL_BUTTON_PATH = os.path.join(IMAGES_DIR, "level_button.png")
 GAME_BG_PATH=os.path.join(IMAGES_DIR, "game_bg.png")
+GAME_BUTTON_PATH = os.path.join(IMAGES_DIR, "game_button.png")
 # --- Board ---
 CELL_SIZE = 90  # Cell size in pixels
 GRID_ROWS = 6
@@ -113,7 +114,7 @@ COLOR_BUTTON_BORDER = (148, 163, 184)
 COLOR_BUTTON_TEXT = (241, 245, 249)
 
 # Vehicle inset from cell boundary
-VEHICLE_INSET = 6
+VEHICLE_INSET = 1
 
 # Movement animation
 MOVE_SPEED_PX_PER_SEC = 420
