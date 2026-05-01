@@ -83,6 +83,7 @@ class ControlBar:
         level_index: int,
         level_total: int,
         powerup_remain: int,
+        mode: str = C.MODE_NORMAL,
     ) -> None:
         label = f"Level {level_index + 1}/{level_total}"
         surf = self._font.render(label, True, C.COLOR_TITLE2)
@@ -90,8 +91,23 @@ class ControlBar:
             (C.CONTROL_BAR_HEIGHT - surf.get_height()) // 2
         surface.blit(surf, (16, y_text))
 
-        for key in ("prev", "next", "pause", "powerup", "reset"):
+        # Define buttons to draw based on mode
+        if mode == C.MODE_NORMAL:
+            draw_keys = ("prev", "next", "pause", "powerup", "reset")
+        else:
+            draw_keys = ("pause", "powerup", "reset")
+
+        for key in draw_keys:
             btn = self._buttons[key]
+            
+            # For non-normal mode, we might want to shift the 'pause' button position
+            # but let's first implement the hiding logic.
+            if key == "pause" and mode != C.MODE_NORMAL:
+                # If in challenge mode, we can optionally move the pause button 
+                # to where 'next' or 'prev' was to keep it tidy, or just keep it there.
+                # The prompt suggests re-layout is optional but recommended.
+                # Let's keep it simple first.
+                pass
 
             if key == "powerup":
                 self._draw_big_powerup_button(
@@ -134,8 +150,10 @@ class ControlBar:
             f"Power Up ({remain}/3)",
         )
 
-    def action_at(self, pos: tuple[int, int]) -> str | None:
+    def action_at(self, pos: tuple[int, int], mode: str = C.MODE_NORMAL) -> str | None:
         for key, btn in self._buttons.items():
+            if mode != C.MODE_NORMAL and key in ("prev", "next"):
+                continue
             if btn.contains(pos):
                 return key
         return None
