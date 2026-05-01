@@ -110,14 +110,19 @@ class CircleButton:
             img_rect = self.image.get_rect(center=self.center)
             surface.blit(self.image, img_rect)
         else:
-            fill = self.hover_color if hovered else self.fill_color
+            # Peach-pink color like the Start button
+            fill = (250, 216, 140) if hovered else (250, 216, 140)
+            border = (249, 207, 119)
+
             # Draw background circle
             pygame.draw.circle(surface, fill, self.center, self.radius)
+
             # Draw border circle
-            pygame.draw.circle(surface, self.border_color, self.center, self.radius, width=2)
-            
+            pygame.draw.circle(surface, border, self.center, self.radius, width=2)
             # Draw text
-            text = self._font.render(self._label, True, self.text_color)
+
+            text_color = (207, 135, 70)
+            text = self._font.render(self._label, True, text_color)
             tr = text.get_rect(center=self.center)
             surface.blit(text, tr)
 

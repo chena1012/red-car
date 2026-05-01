@@ -12,14 +12,18 @@ INFO_BOX1_BG_PATH = os.path.join(IMAGES_DIR, "info_box1_bg.png")
 INFO_BOX2_BG_PATH = os.path.join(IMAGES_DIR, "info_box2_bg.png")
 BOARD_TILES_DIR = os.path.join(IMAGES_DIR, "board_tiles")
 TARGET_BLOCK_IMAGE = "target_car.jpg"
+BOARD_FRAME_PATH = os.path.join(IMAGES_DIR, "board_frame.png")
 LEVEL_BG_PATH = os.path.join(IMAGES_DIR, "level_bg.png")
 LEVEL_BUTTON_PATH = os.path.join(IMAGES_DIR, "level_button.png")
 GAME_BG_PATH = os.path.join(IMAGES_DIR, "game_bg.png")
 GAME_BUTTON_PATH = os.path.join(IMAGES_DIR, "game_button.png")
+BONE_BUTTON_PATH = os.path.join(IMAGES_DIR, "bone_button.png")
+
 # --- Board ---
 CELL_SIZE = 90  # Cell size in pixels
 GRID_ROWS = 6
 GRID_COLS = 6
+BOARD_FRAME_PADDING = 30
 
 # --- Vehicle grass block ---
 BLOCK_IMAGE_PADDING = 0

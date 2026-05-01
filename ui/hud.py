@@ -16,9 +16,13 @@ class ControlBar:
         self._screen_width = screen_width
         self._font = font
         self._big_font = pygame.font.Font(None, 30)
-        self._top_font = pygame.font.Font(None, 22)
+        self._top_font = pygame.font.Font(None, 26)
         self._buttons: dict[str, Button] = {}
+        # Load bone button background image once.
+        self._bone_button_img = pygame.image.load(C.BONE_BUTTON_PATH).convert_alpha()
         self._layout()
+        self._level_font = pygame.font.Font(None, 36)
+        self._level_font.set_bold(True)
 
     def _layout(self) -> None:
         specs = [
@@ -40,7 +44,7 @@ class ControlBar:
         ]
 
         # Make the top three buttons slightly larger.
-        top_button_h = 46
+        top_button_h =70
         top_gap = 16
 
         top_widths = {
@@ -60,14 +64,17 @@ class ControlBar:
             bw = top_widths[key]
             rect = pygame.Rect(x, y, bw, top_button_h)
             self._buttons[key] = Button(rect, label, self._top_font)
-            x += bw + top_gap
 
+            if key == "prev":
+                x += bw + 45
+            else:
+                x += bw + 16
         # Move Power Up, Reset and Hint to the lower area, and make them larger.
-        big_w = 160  # 稍微减小宽度以放下三个按钮
-        big_h = 58
+        big_w = 165
+        big_h = 82
         bottom_y = C.WINDOW_HEIGHT - 90
 
-        # 调整 x 坐标，让三个按钮并排
+        # Adjust the x-coordinate to align the three buttons side by side.
         self._buttons["hint"] = Button(
             pygame.Rect(800, bottom_y - 70, big_w, big_h),
             "Hint",
@@ -102,9 +109,9 @@ class ControlBar:
         mode: str = C.MODE_NORMAL,
     ) -> None:
         label = f"Level {level_index + 1}/{level_total}"
-        surf = self._font.render(label, True, C.COLOR_TITLE2)
+        surf = self._level_font.render(label, True, C.COLOR_TITLE2)
         y_text = C.TITLE_BAR_HEIGHT + \
-            (C.CONTROL_BAR_HEIGHT - surf.get_height()) // 2
+                 (C.CONTROL_BAR_HEIGHT - surf.get_height()) // 2
         surface.blit(surf, (16, y_text))
 
         # Define buttons to draw based on mode
@@ -142,28 +149,74 @@ class ControlBar:
                     surface, btn, mouse_pos, "Undo"
                 )
             else:
-                btn.draw(surface, mouse_pos)
+                label_map = {
+                    "prev": "Previous Level",
+                    "next": "Next Level",
+                    "pause": "Pause",
+                }
+                self._draw_top_bone_button(
+                    surface,
+                    btn,
+                    mouse_pos,
+                    label_map[key],
+                )
 
     def _draw_big_button(self, surface, btn, mouse_pos, label):
         hovered = mouse_pos is not None and btn.rect.collidepoint(mouse_pos)
-        fill = C.COLOR_BUTTON_FILL_HOVER if hovered else C.COLOR_BUTTON_FILL
 
-        pygame.draw.rect(
-            surface,
-            fill,
-            btn.rect,
-            border_radius=C.BUTTON_RADIUS,
-        )
-        pygame.draw.rect(
-            surface,
-            C.COLOR_BUTTON_BORDER,
-            btn.rect,
-            width=3,
-            border_radius=C.BUTTON_RADIUS,
+        # Do not stretch the bone image.
+        # Keep the original image ratio and only control its height.
+        bone_h = int(btn.rect.height * (0.95 if not hovered else 1.05))
+
+        original_w = self._bone_button_img.get_width()
+        original_h = self._bone_button_img.get_height()
+        bone_w = int(original_w * bone_h / original_h)
+
+        img = pygame.transform.smoothscale(
+            self._bone_button_img,
+            (bone_w, bone_h)
         )
 
-        text = self._big_font.render(label, True, C.COLOR_BUTTON_TEXT)
-        text_rect = text.get_rect(center=btn.rect.center)
+        # Put the bone on the left side of the button area.
+        img_rect = img.get_rect()
+        img_rect.midleft = (btn.rect.left + 8, btn.rect.centery)
+
+        surface.blit(img, img_rect)
+
+        # Draw text on top of the bone.
+        text = self._big_font.render(label, True, C.COLOR_TITLE2)
+
+        text_rect = text.get_rect(
+            center=(img_rect.centerx + 35, img_rect.centery)
+        )
+
+        surface.blit(text, text_rect)
+
+    def _draw_top_bone_button(self, surface, btn, mouse_pos, label):
+        hovered = mouse_pos is not None and btn.rect.collidepoint(mouse_pos)
+
+        bone_h = int(btn.rect.height * (0.95 if not hovered else 1.05))
+
+        original_w = self._bone_button_img.get_width()
+        original_h = self._bone_button_img.get_height()
+        bone_w = int(original_w * bone_h / original_h)
+
+        img = pygame.transform.smoothscale(
+            self._bone_button_img,
+            (bone_w, bone_h)
+        )
+
+        img_rect = img.get_rect()
+        img_rect.midleft = (btn.rect.left + 8, btn.rect.centery)
+
+        surface.blit(img, img_rect)
+
+        text = self._top_font.render(label, True, C.COLOR_TITLE2)
+
+        text_rect = text.get_rect(
+            midleft=(img_rect.left + 18, btn.rect.centery)
+        )
+
         surface.blit(text, text_rect)
 
     def _draw_big_powerup_button(self, surface, btn, mouse_pos, remain):
