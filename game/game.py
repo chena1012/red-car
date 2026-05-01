@@ -43,6 +43,27 @@ class WinStars:
     def total(self) -> int:
         return int(self.clear) + int(self.time) + int(self.best_steps)
 
+audio.play_bgm()
+
+
+@dataclass
+class MoveAnimation:
+    vehicle_id: str
+    distance: int
+    elapsed_ms: int
+    duration_ms: int
+
+
+@dataclass(frozen=True)
+class WinStars:
+    clear: bool
+    time: bool
+    best_steps: bool
+
+    @property
+    def total(self) -> int:
+        return int(self.clear) + int(self.time) + int(self.best_steps)
+
 
 class Game:
     def __init__(self) -> None:
