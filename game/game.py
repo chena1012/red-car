@@ -172,6 +172,15 @@ class Game:
             self._board_bg,
             (C.BOARD_PIXEL_W, C.BOARD_PIXEL_H)
         )
+        self._board_frame = pygame.image.load(C.BOARD_FRAME_PATH).convert_alpha()
+        self._board_frame = pygame.transform.smoothscale(
+            self._board_frame,
+            (
+                C.BOARD_PIXEL_W + C.BOARD_FRAME_PADDING * 2,
+                C.BOARD_PIXEL_H + C.BOARD_FRAME_PADDING * 2,
+            )
+        )
+
 
         self._game_bg = pygame.image.load(C.GAME_BG_PATH).convert()
         self._game_bg = pygame.transform.smoothscale(
@@ -1209,6 +1218,17 @@ class Game:
         pygame.draw.polygon(
             self._screen, C.COLOR_EXIT_HIGHLIGHT, (tip, left, right))
 
+    def _draw_board_frame(self) -> None:
+        """Draw decorative frame around the 6x6 board."""
+        frame_x = self._board_x - C.BOARD_FRAME_PADDING
+        frame_y = self._board_y - C.BOARD_FRAME_PADDING
+
+        self._screen.blit(
+            self._board_frame,
+            (frame_x, frame_y)
+        )
+
+
     def _draw_vehicles(self) -> None:
         for v in self._state.vehicles:
             body = self._vehicle_draw_rect(v)
@@ -1690,6 +1710,7 @@ class Game:
             self._screen.blit(self._game_bg, (0, 0))
             self._board.draw(self._screen, self._board_bg)
             self._draw_exit_portal()
+            self._draw_board_frame()
             self._draw_vehicles()
             self._draw_hud()
             self._draw_title()

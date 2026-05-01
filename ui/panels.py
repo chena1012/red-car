@@ -128,10 +128,10 @@ class LevelSelect:
         # Mapping based on user requirements (proportional to screen size)
         # Level 1 (index 0), Level 2 (index 1), etc.
         layouts = [
-            {"time": (0.15, 0.505), "step": (0.28, 0.515)}, # Level 1
-            {"time": (0.4, 0.537), "step": (0.51, 0.505)}, # Level 2
-            {"time": (0.63, 0.465), "step": (0.74, 0.485)}, # Level 3
-            {"time": (0.83, 0.53), "step": (0.92, 0.535)}, # Level 4
+            {"time": (0.18, 0.505), "step": (0.25, 0.515)},  # Level 1
+            {"time": (0.42, 0.537), "step": (0.49, 0.515)},  # Level 2
+            {"time": (0.65, 0.465), "step": (0.72, 0.480)},  # Level 3
+            {"time": (0.85, 0.53), "step": (0.92, 0.535)},  # Level 4
         ]
         
         if level_index < len(layouts):
