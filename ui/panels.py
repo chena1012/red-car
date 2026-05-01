@@ -392,12 +392,12 @@ class PausePanel:
         self._layout()
 
     def _layout(self) -> None:
-        button_w = 280
+        button_w = 200
         button_h = 50
         gap = 20
-        x = (self._screen_width - button_w) // 2
+        x = (self._screen_width - button_w) // 2+40
         # Center the button group vertically in the bottom 2/3 of the panel
-        start_y = self._screen_height // 2 - 40 
+        start_y = self._screen_height // 2 - 40
         specs = [
             ("continue", "Continue"),
             ("save_exit", "Save and Exit"),
@@ -408,6 +408,8 @@ class PausePanel:
         for key, label in specs:
             self._buttons[key] = Button(
                 (x, y, button_w, button_h), label, self._button_font)
+            self._buttons[key].set_colors(fill=C.COLOR_TITLE1, hover=(
+                249, 207, 119), border=C.COLOR_TITLE1)
             y += button_h + gap
 
     def draw(self, surface: pygame.Surface, mouse_pos: tuple[int, int] | None) -> None:
@@ -424,8 +426,8 @@ class PausePanel:
         panel_rect.center = (self._screen_width // 2, self._screen_height // 2)
         
         # Draw panel background with border
-        pygame.draw.rect(surface, (45, 55, 72), panel_rect, border_radius=15)
-        pygame.draw.rect(surface, C.COLOR_EXIT_HIGHLIGHT, panel_rect, width=4, border_radius=15)
+        pygame.draw.rect(surface, (120,177,124), panel_rect, border_radius=15)
+        pygame.draw.rect(surface, C.COLOR_TITLE, panel_rect, width=4, border_radius=15)
 
         title = self._title_font.render("Paused", True, C.COLOR_WIN_TEXT)
         title_rect = title.get_rect(

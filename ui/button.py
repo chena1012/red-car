@@ -25,7 +25,7 @@ class Button:
         self.border_color = C.COLOR_BUTTON_BORDER
         self.text_color = C.COLOR_BUTTON_TEXT
         self.border_radius = border_radius
-
+        
     def set_colors(self, fill=None, hover=None, border=None, text=None):
         if fill is not None:
             self.fill_color = fill
@@ -54,6 +54,7 @@ class Button:
             width=2,
             border_radius= self.border_radius,
         )
+    
         text = self._font.render(self._label, True,
         # C.COLOR_BUTTON_TEXT
         self.text_color)

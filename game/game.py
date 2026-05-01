@@ -1353,7 +1353,7 @@ class Game:
         seconds = total_seconds % 60
 
         is_normal = self._mode == C.MODE_NORMAL
-        title_text = "You Win!" if is_normal else "Challenge Completed!"
+        title_text = "YOU WIN!" if is_normal else "Challenge Completed!"
         line1 = self._font_win.render(title_text, True, C.COLOR_WIN_TEXT)
 
         # Content surfaces list
@@ -1443,8 +1443,8 @@ class Game:
         panel.center = (C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT // 2)
         pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL,
                          panel, border_radius=12)
-        pygame.draw.rect(self._screen, C.COLOR_EXIT_HIGHLIGHT,
-                         panel, width=3, border_radius=12)
+        pygame.draw.rect(self._screen, (98,64,60),
+                         panel, width=15, border_radius=12)
 
         y = panel.top + 24
         r1 = line1.get_rect(centerx=panel.centerx, top=y)
@@ -1504,10 +1504,19 @@ class Game:
             for i, (key, label) in enumerate(button_specs):
                 bx = start_x + i * (btn_w + gap)
                 self._result_buttons[key] = Button(
-                    (bx, y_btns, btn_w, btn_h),
+                    (bx, y_btns-30, btn_w, btn_h),
                     label,
                     self._font_btn
                 )
+
+                if key == "prev":
+                    self._result_buttons[key].set_colors((20,160,60),(20,160,60),(40,23,20),(1,2,0))   # 红色
+                elif key == "reset":
+                    self._result_buttons[key].set_colors((245,206,83),(245,206,83),(40,23,20),(1,2,0))   # 绿色
+                elif key == "next":
+                    self._result_buttons[key].set_colors((240,117,46),(240,117,46),(40,23,20),(1,2,0))   # 蓝色
+                elif key == "exit":
+                    self._result_buttons[key].set_colors((200, 200, 200),(200, 200, 200),(40,23,20),(1,2,0))   # 灰色
 
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
@@ -1515,7 +1524,7 @@ class Game:
 
     def _draw_fail_overlay(self) -> None:
         """Translucent layer for failure state."""
-        
+
         w, h = self._screen.get_size()
         y0 = C.TOP_SECTION_HEIGHT
         overlay = pygame.Surface((w, h - y0), pygame.SRCALPHA)
