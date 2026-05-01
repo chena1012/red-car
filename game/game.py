@@ -204,7 +204,7 @@ class Game:
         self._powerup_remain = 3
         self._initialize_mode_limits()
 
-    def _set_status(self, text: str, duration_ms: int = 2200,color=C.COLOR_TITLE2) -> None:
+    def _set_status(self, text: str, duration_ms: int = 2200, color=C.COLOR_TITLE2) -> None:
         self._status_text = text
         self._status_ms_left = duration_ms
         self._status_color = color
@@ -254,10 +254,10 @@ class Game:
         if self._move_anim is not None:
             self._set_status("Cannot save during animation.")
             return False
-        
+
         # 保存前先从磁盘合并一次，防止多模式切换时内存数据覆盖了已有的磁盘记录
         self._merge_challenge_clears_from_save()
-        
+
         ok, msg = self._save_manager.save(self._build_save_payload())
         self._set_status(msg)
         if ok:
@@ -268,7 +268,7 @@ class Game:
         """保存全局进度（解锁关卡、最高分、挑战状态），但不覆盖已有的即时进度（如车辆位置等）。"""
         old_data, _ = self._save_manager.load()
         payload = old_data if isinstance(old_data, dict) else {}
-        
+
         # 合并挑战通关状态
         old_challenge = payload.get("challenge_clears", {})
         merged_challenge = {}
@@ -276,7 +276,7 @@ class Game:
             for k, v in old_challenge.items():
                 if bool(v):
                     merged_challenge[str(k)] = True
-        
+
         # 合并内存中的最新记录
         for k, v in self._challenge_clears.items():
             if bool(v):
@@ -295,7 +295,7 @@ class Game:
             "total_removed_vehicles": self._total_removed_vehicles,
             "challenge_clears": merged_challenge,
         })
-        
+
         ok, _ = self._save_manager.save(payload)
         return ok
 
@@ -390,7 +390,7 @@ class Game:
             self._mode = mode
 
             self._powerup_remain = max(0, int(data.get("powerup_remain", 3)))
-            
+
             # Limits restoration: prefer saved values if they exist
             if "time_limit_ms" in data:
                 self._time_limit_ms = int(data["time_limit_ms"])
@@ -428,8 +428,10 @@ class Game:
             self._best_stars_by_level = parsed_stars
 
             # 加载全局统计和挑战进度
-            self._total_powerup_used = int(data.get("total_powerup_used", self._total_powerup_used))
-            self._total_removed_vehicles = int(data.get("total_removed_vehicles", self._total_removed_vehicles))
+            self._total_powerup_used = int(
+                data.get("total_powerup_used", self._total_powerup_used))
+            self._total_removed_vehicles = int(
+                data.get("total_removed_vehicles", self._total_removed_vehicles))
             raw_challenge = data.get("challenge_clears", {})
             if isinstance(raw_challenge, dict):
                 self._challenge_clears = {
@@ -576,7 +578,8 @@ class Game:
                         if action[0] == "level":
                             _, level_index = action
                             self._load_level(level_index, C.MODE_NORMAL)
-                            self._try_restore_save_for(level_index, C.MODE_NORMAL)
+                            self._try_restore_save_for(
+                                level_index, C.MODE_NORMAL)
                         elif action[0] == "mode":
                             _, level_index, mode = action
                             self._load_level(level_index, mode)
@@ -646,9 +649,13 @@ class Game:
                 self._state_name = "PAUSED"
             return
         if action == "powerup":
-            if self._powerup_remain > 0 and not self._failed:
-                self._powerup_active = True
-                self._selected_id = None
+            if self._powerup_remain > 0:
+                if self._powerup_active:
+                    self._powerup_active = False
+                    self._selected_id = None
+                else:
+                    self._powerup_active = True
+                    self._selected_id = None
             return
 
         if self._failed or self._won:
@@ -882,7 +889,7 @@ class Game:
         else:
             total_seconds = self._elapsed_ms // 1000
             time_label = "Time"
-        
+
         minutes = total_seconds // 60
         seconds = total_seconds % 60
         time_str = f"{minutes:02d}:{seconds:02d}"
@@ -901,7 +908,7 @@ class Game:
 
         # --- Draw Time Box ---
         self._screen.blit(self._info_box1_bg, time_rect.topleft)
-        
+
         # Draw Label(s)
         time_label_surf = self._font_hud_label.render(
             time_label, True, C.COLOR_TITLE2
@@ -910,27 +917,31 @@ class Game:
             center=(time_rect.centerx + 30, time_rect.y + 36)
         )
         self._screen.blit(time_label_surf, time_label_rect)
-            
+
         # Draw Value
-        time_val_surf = self._font_hud_value.render(time_str, True, C.COLOR_TITLE1)
-        time_val_rect = time_val_surf.get_rect(center=(time_rect.centerx + 30, time_rect.y + 75))
+        time_val_surf = self._font_hud_value.render(
+            time_str, True, C.COLOR_TITLE1)
+        time_val_rect = time_val_surf.get_rect(
+            center=(time_rect.centerx + 30, time_rect.y + 75))
         self._screen.blit(time_val_surf, time_val_rect)
 
         # --- Draw Step Box ---
         self._screen.blit(self._info_box2_bg, step_rect.topleft)
-        
+
         # Draw Label(s)
         step_label_surf = self._font_hud_label.render(
-        step_label, True, C.COLOR_TITLE2
+            step_label, True, C.COLOR_TITLE2
         )
         step_label_rect = step_label_surf.get_rect(
-        center=(step_rect.centerx + 25, step_rect.y + 36)
+            center=(step_rect.centerx + 25, step_rect.y + 36)
         )
         self._screen.blit(step_label_surf, step_label_rect)
-            
+
         # Draw Value
-        step_val_surf = self._font_hud_value.render(step_val_text, True, C.COLOR_TITLE1)
-        step_val_rect = step_val_surf.get_rect(center=(step_rect.centerx + 25, step_rect.y + 75))
+        step_val_surf = self._font_hud_value.render(
+            step_val_text, True, C.COLOR_TITLE1)
+        step_val_rect = step_val_surf.get_rect(
+            center=(step_rect.centerx + 25, step_rect.y + 75))
         self._screen.blit(step_val_surf, step_val_rect)
 
     def _cell_rect_pixels(self, row: int, col: int) -> pygame.Rect:
@@ -1117,7 +1128,7 @@ class Game:
         total_seconds = self._elapsed_ms // 1000
         minutes = total_seconds // 60
         seconds = total_seconds % 60
-        
+
         is_normal = self._mode == C.MODE_NORMAL
         title_text = "You Win!" if is_normal else "Challenge Completed!"
         line1 = self._font_win.render(title_text, True, C.COLOR_WIN_TEXT)
@@ -1140,7 +1151,7 @@ class Game:
 
         # Panel dimensions calculation
         # ... (rest of the content_surfs list will be handled below)
-        
+
         if is_normal:
             stars = self._get_win_stars()
             time_limit = self._time_star_limit_seconds(self._level_index)
@@ -1156,11 +1167,13 @@ class Game:
             score_surf = self._font_ui.render(
                 f"score: {stars.total}/3 stars", True, C.COLOR_WIN_TEXT
             )
-            content_surfs.extend([time_target_surf, best_steps_surf, score_surf])
-            
+            content_surfs.extend(
+                [time_target_surf, best_steps_surf, score_surf])
+
             last = self._level_index == level_count() - 1
             if last:
-                line2 = self._font_ui.render("All levels completed!", True, C.COLOR_WIN_TEXT)
+                line2 = self._font_ui.render(
+                    "All levels completed!", True, C.COLOR_WIN_TEXT)
                 content_surfs.append(line2)
             else:
                 line2 = None
@@ -1168,32 +1181,37 @@ class Game:
             stars = None
             line2 = None
 
-        panel_content_width = max([s.get_width() for s in content_surfs] + [240])
+        panel_content_width = max([s.get_width()
+                                  for s in content_surfs] + [240])
         panel_w = panel_content_width + 80
-        
+
         # Calculate height based on content
         btn_h = 40
         gap = 10
-        panel_h = 24 + line1.get_height() + 20 # Top part
-        
+        panel_h = 24 + line1.get_height() + 20  # Top part
+
         if is_normal:
-            panel_h += 40 + 12 # Star row
+            panel_h += 40 + 12  # Star row
             panel_h += step_surf.get_height() + 6 + time_surf.get_height() + 8
-            panel_h += time_target_surf.get_height() + 8 + best_steps_surf.get_height() + 8 + score_surf.get_height() + 14
-            if line2: panel_h += line2.get_height() + 14
+            panel_h += time_target_surf.get_height() + 8 + best_steps_surf.get_height() + \
+                8 + score_surf.get_height() + 14
+            if line2:
+                panel_h += line2.get_height() + 14
         else:
-            panel_h += 20 # Small gap
+            panel_h += 20  # Small gap
             # 修复：判断 time_surf 是否存在，不存在就用 0 代替
             step_h = step_surf.get_height() if step_surf else 0
             time_h = time_surf.get_height() if time_surf else 0
             panel_h += step_h + 10 + time_h + 20
 
-        panel_h += btn_h + 30 # Buttons part
+        panel_h += btn_h + 30  # Buttons part
 
         panel = pygame.Rect(0, 0, panel_w, panel_h)
         panel.center = (C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT // 2)
-        pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL, panel, border_radius=12)
-        pygame.draw.rect(self._screen, C.COLOR_EXIT_HIGHLIGHT, panel, width=3, border_radius=12)
+        pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL,
+                         panel, border_radius=12)
+        pygame.draw.rect(self._screen, C.COLOR_EXIT_HIGHLIGHT,
+                         panel, width=3, border_radius=12)
 
         y = panel.top + 24
         r1 = line1.get_rect(centerx=panel.centerx, top=y)
@@ -1207,27 +1225,28 @@ class Game:
                 stars_on=(stars.clear, stars.time, stars.best_steps),
             )
             y += 52
-            
+
             r_step = step_surf.get_rect(centerx=panel.centerx, top=y)
             self._screen.blit(step_surf, r_step)
             y = r_step.bottom + 6
-            
+
             r_time = time_surf.get_rect(centerx=panel.centerx, top=y)
             self._screen.blit(time_surf, r_time)
             y = r_time.bottom + 8
-            
-            r_time_target = time_target_surf.get_rect(centerx=panel.centerx, top=y)
+
+            r_time_target = time_target_surf.get_rect(
+                centerx=panel.centerx, top=y)
             self._screen.blit(time_target_surf, r_time_target)
             y = r_time_target.bottom + 8
-            
+
             r_best = best_steps_surf.get_rect(centerx=panel.centerx, top=y)
             self._screen.blit(best_steps_surf, r_best)
             y = r_best.bottom + 8
-            
+
             r_score = score_surf.get_rect(centerx=panel.centerx, top=y)
             self._screen.blit(score_surf, r_score)
             y = r_score.bottom + 14
-            
+
             if line2:
                 r2 = line2.get_rect(centerx=panel.centerx, top=y)
                 self._screen.blit(line2, r2)
@@ -1238,7 +1257,7 @@ class Game:
                 r_step = step_surf.get_rect(centerx=panel.centerx, top=y)
                 self._screen.blit(step_surf, r_step)
                 y = r_step.bottom + 10
-            
+
             if time_surf:
                 r_time = time_surf.get_rect(centerx=panel.centerx, top=y)
                 self._screen.blit(time_surf, r_time)
@@ -1249,10 +1268,12 @@ class Game:
         x_reset = panel.centerx - btn_w - 10
         x_exit = panel.centerx + 10
         y_btns = panel.bottom - btn_h - 20
-        
-        self._result_buttons["reset"] = Button((x_reset, y_btns, btn_w, btn_h), "Reset", self._font_btn)
-        self._result_buttons["exit"] = Button((x_exit, y_btns, btn_w, btn_h), "Exit", self._font_btn)
-        
+
+        self._result_buttons["reset"] = Button(
+            (x_reset, y_btns, btn_w, btn_h), "Reset", self._font_btn)
+        self._result_buttons["exit"] = Button(
+            (x_exit, y_btns, btn_w, btn_h), "Exit", self._font_btn)
+
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
             btn.draw(self._screen, mouse)
@@ -1267,31 +1288,34 @@ class Game:
 
         # Title
         line1 = self._font_win.render("You Fail!", True, C.COLOR_WIN_TEXT)
-        
+
         # Stats based on mode
         reason_str = ""
         stats_to_draw = []
-        
+
         if self._mode == C.MODE_LIMITED_TIME:
             reason_str = "Reason: Time Up"
             stats_to_draw.append("time left: 00:00")
         elif self._mode == C.MODE_LIMITED_STEP:
             reason_str = "Reason: No Steps Left"
             stats_to_draw.append("steps left: 0")
-        
+
         reason_surf = self._font_ui.render(reason_str, True, C.COLOR_WIN_TEXT)
-        stat_surfs = [self._font_hud_label.render(s, True, C.COLOR_WIN_TEXT) for s in stats_to_draw]
-        footer_surf = self._font_ui.render("Press Reset to try again.", True, C.COLOR_WIN_TEXT)
+        stat_surfs = [self._font_hud_label.render(
+            s, True, C.COLOR_WIN_TEXT) for s in stats_to_draw]
+        footer_surf = self._font_ui.render(
+            "Press Reset to try again.", True, C.COLOR_WIN_TEXT)
 
         panel_content_width = max(
             [line1.get_width(), reason_surf.get_width(), footer_surf.get_width(), 240] +
             [s.get_width() for s in stat_surfs]
         )
-        
+
         panel_w = panel_content_width + 80
         btn_h = 40
-        
-        stats_height = sum(s.get_height() for s in stat_surfs) + (len(stat_surfs) - 1) * 6 if stat_surfs else 0
+
+        stats_height = sum(s.get_height() for s in stat_surfs) + \
+            (len(stat_surfs) - 1) * 6 if stat_surfs else 0
 
         panel_h = (
             line1.get_height()
@@ -1299,19 +1323,21 @@ class Game:
             + 40  # star row space
             + 12  # gap
             + stats_height
-            + (10 if stat_surfs else 0) # gap after stats
+            + (10 if stat_surfs else 0)  # gap after stats
             + reason_surf.get_height()
             + 10  # gap
             + footer_surf.get_height()
             + 20  # gap before buttons
-            + btn_h # buttons
+            + btn_h  # buttons
             + 28  # bottom margin
         )
 
         panel = pygame.Rect(0, 0, panel_w, panel_h)
         panel.center = (C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT // 2)
-        pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL, panel, border_radius=12)
-        pygame.draw.rect(self._screen, C.COLOR_EXIT_HIGHLIGHT, panel, width=3, border_radius=12)
+        pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL,
+                         panel, border_radius=12)
+        pygame.draw.rect(self._screen, C.COLOR_EXIT_HIGHLIGHT,
+                         panel, width=3, border_radius=12)
 
         y = panel.top + 24
         r1 = line1.get_rect(centerx=panel.centerx, top=y)
@@ -1329,11 +1355,12 @@ class Game:
             r_stat = s.get_rect(centerx=panel.centerx, top=y)
             self._screen.blit(s, r_stat)
             y = r_stat.bottom + 6
-        
+
         r_reason = reason_surf.get_rect(centerx=panel.centerx, top=y + 2)
         self._screen.blit(reason_surf, r_reason)
-        
-        r_footer = footer_surf.get_rect(centerx=panel.centerx, top=r_reason.bottom + 10)
+
+        r_footer = footer_surf.get_rect(
+            centerx=panel.centerx, top=r_reason.bottom + 10)
         self._screen.blit(footer_surf, r_footer)
 
         # Draw Buttons
@@ -1341,10 +1368,12 @@ class Game:
         x_reset = panel.centerx - btn_w - 10
         x_exit = panel.centerx + 10
         y_btns = panel.bottom - btn_h - 24
-        
-        self._result_buttons["reset"] = Button((x_reset, y_btns, btn_w, btn_h), "Reset", self._font_btn)
-        self._result_buttons["exit"] = Button((x_exit, y_btns, btn_w, btn_h), "Exit", self._font_btn)
-        
+
+        self._result_buttons["reset"] = Button(
+            (x_reset, y_btns, btn_w, btn_h), "Reset", self._font_btn)
+        self._result_buttons["exit"] = Button(
+            (x_exit, y_btns, btn_w, btn_h), "Exit", self._font_btn)
+
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
             btn.draw(self._screen, mouse)
@@ -1405,13 +1434,13 @@ class Game:
             self._draw_hud()
             self._draw_title()
             self._control_bar.draw(
-                    self._screen,
-                    mouse,
-                    self._level_index,
-                    level_count(),
-                    self._powerup_remain,
-                    self._mode,
-                )
+                self._screen,
+                mouse,
+                self._level_index,
+                level_count(),
+                self._powerup_remain,
+                self._mode,
+            )
 
         if self._state_name == "PAUSED":
             self._pause_panel.draw(self._screen, mouse)
