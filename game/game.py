@@ -793,7 +793,7 @@ class Game:
             self._set_status(hint, duration_ms=3000)
             audio.play_click()
 
-            # 自动高亮要移动的车
+            # Automatically highlight the vehicle to be moved.
             if "Move " in hint:
                 parts = hint.split()
                 if len(parts) >= 3:
@@ -818,10 +818,10 @@ class Game:
             return
 
         if self._powerup_active and v is not None and not v.is_target:
-            self._push_undo() # 在移除车辆前记录状态
+            self._push_undo() # Record the status before removing the vehicle
             self._state.remove_vehicle(v.id)
             self._powerup_active = False
-            self._powerup_remain -= 1   # 消耗一次
+            self._powerup_remain -= 1   # Consume once
             self._total_powerup_used += 1
             self._total_removed_vehicles += 1
             audio.play_remove()
@@ -1138,7 +1138,7 @@ class Game:
             )
 
     def _push_undo(self) -> None:
-        """记录当前状态到撤销栈。"""
+        """Record the current state to the undo stack."""
         state = UndoState(
             vehicles_data=self._state.export_vehicles(),
             steps=self._steps,
@@ -1148,12 +1148,12 @@ class Game:
             total_removed_vehicles=self._total_removed_vehicles
         )
         self._undo_stack.append(state)
-        # 限制撤销步数，防止内存占用过大（可选，例如最近 50 步）
+        # Limit the number of undo steps to prevent excessive memory usage (optional, for example, the last 50 steps)
         if len(self._undo_stack) > 50:
             self._undo_stack.pop(0)
 
     def _undo(self) -> None:
-        """执行撤销操作。"""
+        """Perform the undo operation."""
         if not self._undo_stack or self._move_anim is not None or self._won or self._failed:
             return
 
@@ -1360,12 +1360,11 @@ class Game:
 
     def _draw_win_overlay(self) -> None:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
-        
+
         w, h = self._screen.get_size()
-        y0 = C.TOP_SECTION_HEIGHT
-        overlay = pygame.Surface((w, h - y0), pygame.SRCALPHA)
+        overlay = pygame.Surface((w, h), pygame.SRCALPHA)
         overlay.fill(C.COLOR_WIN_OVERLAY)
-        self._screen.blit(overlay, (0, y0))
+        self._screen.blit(overlay, (0, 0))
 
         # Prepare stats text
         total_seconds = self._elapsed_ms // 1000
@@ -1463,7 +1462,7 @@ class Game:
         panel.center = (C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT // 2)
         pygame.draw.rect(self._screen, C.COLOR_WIN_PANEL,
                          panel, border_radius=12)
-        pygame.draw.rect(self._screen, (98,64,60),
+        pygame.draw.rect(self._screen, (226, 244, 205),
                          panel, width=15, border_radius=12)
 
         y = panel.top + 24
@@ -1546,10 +1545,9 @@ class Game:
         """Translucent layer for failure state."""
 
         w, h = self._screen.get_size()
-        y0 = C.TOP_SECTION_HEIGHT
-        overlay = pygame.Surface((w, h - y0), pygame.SRCALPHA)
+        overlay = pygame.Surface((w, h), pygame.SRCALPHA)
         overlay.fill(C.COLOR_WIN_OVERLAY)
-        self._screen.blit(overlay, (0, y0))
+        self._screen.blit(overlay, (0, 0))
 
         # Title
         line1 = self._font_win.render("You Fail!", True, C.COLOR_WIN_TEXT)
