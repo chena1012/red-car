@@ -1362,8 +1362,6 @@ class Game:
         """Translucent layer covering board and HUD, keeping title and buttons clickable."""
 
         w, h = self._screen.get_size()
-
-
         overlay = pygame.Surface((w, h), pygame.SRCALPHA)
         overlay.fill(C.COLOR_WIN_OVERLAY)
         self._screen.blit(overlay, (0, 0))
