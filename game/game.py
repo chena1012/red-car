@@ -129,7 +129,7 @@ class Game:
         self._load_game_metadata()
         self._state_name = "MENU"
 
-        self._font_title = pygame.font.Font(None, 28)
+        self._font_title = pygame.font.Font(None, 50)
         self._font_title.set_bold(True)
         self._font_ui = pygame.font.Font(None, 18)
         self._status_font = pygame.font.Font(None, 40)
@@ -1059,7 +1059,7 @@ class Game:
             "Pup Rescue: lawn block", True, C.COLOR_TITLE2
         )
         text_rect = text_surf.get_rect(
-            center=(C.WINDOW_WIDTH // 2, C.TITLE_BAR_HEIGHT // 2)
+            center=(C.WINDOW_WIDTH // 2, C.TITLE_BAR_HEIGHT // 2+20)
         )
         self._screen.blit(text_surf, text_rect)
 
@@ -1637,7 +1637,7 @@ class Game:
 
         # Draw Buttons
         start_x = panel.centerx - total_btns_w // 2
-        y_btns = C.WINDOW_HEIGHT // 2 + 115
+        y_btns = C.WINDOW_HEIGHT // 2 + 70
         
         if not self._result_buttons:
             for i, (key, label) in enumerate(button_specs):
@@ -1647,7 +1647,11 @@ class Game:
                     label,
                     self._font_btn
                 )
-
+                if key == "exit":
+                    self._result_buttons[key].set_colors((20,160,60),(20,160,60),(40,23,20),(1,2,0))   # 红色
+                elif key == "reset":
+                    self._result_buttons[key].set_colors((245,206,83),(245,206,83),(40,23,20),(1,2,0))  
+                
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
             btn.draw(self._screen, mouse)
