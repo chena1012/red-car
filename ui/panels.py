@@ -395,7 +395,7 @@ class PausePanel:
         button_w = 200
         button_h = 50
         gap = 20
-        x = (self._screen_width - button_w) // 2+40
+        x = (self._screen_width - button_w) // 2
         # Center the button group vertically in the bottom 2/3 of the panel
         start_y = self._screen_height // 2 - 40
         specs = [

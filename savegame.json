@@ -1,8 +1,8 @@
 {
   "version": 1,
   "level_index": -1,
-  "steps": 1,
-  "elapsed_ms": 3654,
+  "steps": 2,
+  "elapsed_ms": 6788,
   "won": true,
   "failed": false,
   "mode": "NORMAL",
@@ -95,9 +95,9 @@
   ],
   "best_steps_by_level": {
     "0": 1,
-    "1": 20,
-    "2": 7,
-    "3": 4
+    "1": 17,
+    "2": 1,
+    "3": 1
   },
   "best_stars_by_level": {
     "0": 3,
@@ -105,7 +105,11 @@
     "2": 3,
     "3": 3
   },
-  "total_powerup_used": 19,
-  "total_removed_vehicles": 19,
-  "challenge_clears": {}
+  "total_powerup_used": 38,
+  "total_removed_vehicles": 38,
+  "challenge_clears": {
+    "0:LIMITED_STEP": true,
+    "0:LIMITED_TIME": true,
+    "3:LIMITED_TIME": true
+  }
 }
