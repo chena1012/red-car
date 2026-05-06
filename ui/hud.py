@@ -10,9 +10,17 @@ from .button import Button
 
 
 class ControlBar:
-    """Draws level info and buttons in a row below the title."""
+    """Draws level info and functional buttons in the UI layout.
+    Manages button positioning, rendering, and click detection for game controls.
+    """
 
     def __init__(self, screen_width: int, font: pygame.font.Font) -> None:
+        """Initialize the control bar with UI fonts, images, and button layout.
+        
+        Args:
+            screen_width: Total width of the game window
+            font: Base font for UI text rendering
+        """
         self._screen_width = screen_width
         self._font = font
         self._big_font = pygame.font.Font(None, 30)
@@ -25,10 +33,13 @@ class ControlBar:
         self._level_font.set_bold(True)
 
     def _layout(self) -> None:
+        """Configure position and size for all control buttons.
+        Separates buttons into top-right navigation bar and bottom functional area.
+        """
         specs = [
             ("hint", "Hint"),
             ("undo", "Undo"),
-            ("powerup", "Remove"),
+            ("remove", "Remove"),
             ("reset", "Reset"),
             ("prev", "Previous Level"),
             ("next", "Next Level"),
@@ -69,7 +80,7 @@ class ControlBar:
                 x += bw + 45
             else:
                 x += bw + 16
-        # Move Power Up, Reset and Hint to the lower area, and make them larger.
+        # Move Remove, Reset and Hint to the lower area, and make them larger.
         big_w = 165
         big_h = 82
         bottom_y = C.WINDOW_HEIGHT - 90
@@ -87,7 +98,7 @@ class ControlBar:
             self._font,
         )
 
-        self._buttons["powerup"] = Button(
+        self._buttons["remove"] = Button(
             pygame.Rect(625, bottom_y, big_w, big_h),
             "Remove",
             self._font,
@@ -105,9 +116,19 @@ class ControlBar:
         mouse_pos: tuple[int, int] | None,
         level_index: int,
         level_total: int,
-        powerup_remain: int,
+        remove_remain: int,
         mode: str = C.MODE_NORMAL,
     ) -> None:
+        """Render the control bar, level label, and all visible buttons.
+        
+        Args:
+            surface: Pygame surface to draw on
+            mouse_pos: Current mouse coordinates for hover effects
+            level_index: Index of the current level
+            level_total: Total number of available levels
+            remove_remain: Remaining uses for the remove feature
+            mode: Current game mode (normal/challenge)
+        """
         label = f"Level {level_index + 1}/{level_total}"
         surf = self._level_font.render(label, True, C.COLOR_TITLE2)
         y_text = C.TITLE_BAR_HEIGHT + \
@@ -116,9 +137,9 @@ class ControlBar:
 
         # Define buttons to draw based on mode
         if mode == C.MODE_NORMAL:
-            draw_keys = ("prev", "next", "pause", "hint", "undo", "powerup", "reset")
+            draw_keys = ("prev", "next", "pause", "hint", "undo", "remove", "reset")
         else:
-            draw_keys = ("pause", "hint", "undo", "powerup", "reset")
+            draw_keys = ("pause", "hint", "undo", "remove", "reset")
 
         for key in draw_keys:
             btn = self._buttons[key]
@@ -132,9 +153,9 @@ class ControlBar:
                 # Let's keep it simple first.
                 pass
 
-            if key == "powerup":
-                self._draw_big_powerup_button(
-                    surface, btn, mouse_pos, powerup_remain
+            if key == "remove":
+                self._draw_big_remove_button(
+                    surface, btn, mouse_pos, remove_remain
                 )
             elif key == "reset":
                 self._draw_big_button(
@@ -162,6 +183,14 @@ class ControlBar:
                 )
 
     def _draw_big_button(self, surface, btn, mouse_pos, label):
+        """Render a large functional button with bone background and hover effect.
+        
+        Args:
+            surface: Pygame surface to draw on
+            btn: Button object to render
+            mouse_pos: Current mouse coordinates for hover detection
+            label: Text to display on the button
+        """
         hovered = mouse_pos is not None and btn.rect.collidepoint(mouse_pos)
 
         # Do not stretch the bone image.
@@ -193,6 +222,14 @@ class ControlBar:
         surface.blit(text, text_rect)
 
     def _draw_top_bone_button(self, surface, btn, mouse_pos, label):
+        """Render a small top navigation button with bone background.
+        
+        Args:
+            surface: Pygame surface to draw on
+            btn: Button object to render
+            mouse_pos: Current mouse coordinates for hover detection
+            label: Text to display on the button
+        """
         hovered = mouse_pos is not None and btn.rect.collidepoint(mouse_pos)
 
         bone_h = int(btn.rect.height * (0.95 if not hovered else 1.05))
@@ -219,7 +256,15 @@ class ControlBar:
 
         surface.blit(text, text_rect)
 
-    def _draw_big_powerup_button(self, surface, btn, mouse_pos, remain):
+    def _draw_big_remove_button(self, surface, btn, mouse_pos, remain):
+        """Render the remove button with remaining usage count.
+        
+        Args:
+            surface: Pygame surface to draw on
+            btn: Button object to render
+            mouse_pos: Current mouse coordinates for hover detection
+            remain: Number of remaining remove uses
+        """
         self._draw_big_button(
             surface,
             btn,
@@ -228,6 +273,14 @@ class ControlBar:
         )
 
     def action_at(self, pos: tuple[int, int], mode: str = C.MODE_NORMAL) -> str | None:
+        """Detect which button was clicked at the given position.
+        
+        Args:
+            pos: Mouse click coordinates
+            mode: Current game mode to filter visible buttons
+        Returns:
+            Button key if clicked, None otherwise
+        """
         for key, btn in self._buttons.items():
             if mode != C.MODE_NORMAL and key in ("prev", "next"):
                 continue

@@ -10,9 +10,19 @@ from .button import Button, CircleButton
 
 
 class Menu:
-    """Game start menu with Start and Exit buttons."""
+    """Main game start menu with Start and Exit interactive buttons.
+    Handles UI layout, rendering, and mouse click detection for the main menu.
+    """
 
     def __init__(self, screen_width: int, screen_height: int, title_font: pygame.font.Font, button_font: pygame.font.Font) -> None:
+        """Initialize the main menu with screen dimensions and fonts.
+        
+        Args:
+            screen_width: Total width of the game window
+            screen_height: Total height of the game window
+            title_font: Font for rendering menu title
+            button_font: Font for rendering button text
+        """
         self._screen_width = screen_width
         self._screen_height = screen_height
         self._title_font = title_font
@@ -29,10 +39,11 @@ class Menu:
         self._layout()
 
     def _layout(self) -> None:
-        # Title position
+        """Configure position, size, and style for all menu buttons."""
+        # Title vertical position
         self._title_y = self._screen_height // 4
 
-        # Button specs
+        # Button configuration
         specs = [
             ("start", "Start"),
             ("exit", "Exit"),
@@ -44,7 +55,7 @@ class Menu:
 
         total_height = (button_h * len(specs)) + (gap * (len(specs) - 1))
 
-        # Move menu buttons lower to avoid covering the title/background art.
+        # Vertical offset to position buttons below title art
         button_offset_y = 90
         start_y = self._screen_height // 2 + button_offset_y
 
@@ -61,14 +72,25 @@ class Menu:
             y += button_h + gap
 
     def draw(self, surface: pygame.Surface, mouse_pos: tuple[int, int] | None) -> None:
-        # The menu background and title are drawn in game/game.py.
-        # Only draw the menu buttons here so the background image stays visible.
-
+        """Render menu buttons on the screen.
+        Background/title rendering is handled in the main game loop.
+        
+        Args:
+            surface: Pygame surface to draw on
+            mouse_pos: Current mouse coordinates for hover effects
+        """
         # Draw Buttons
         for btn in self._buttons.values():
             btn.draw(surface, mouse_pos)
 
     def action_at(self, pos: tuple[int, int]) -> str | None:
+        """Detect which menu button was clicked.
+        
+        Args:
+            pos: Mouse click coordinates
+        Returns:
+            Button key (start/exit) if clicked, None otherwise
+        """
         for key, btn in self._buttons.items():
             if btn.contains(pos):
                 audio.play_click()
@@ -77,7 +99,9 @@ class Menu:
 
 
 class LevelSelect:
-    """Level selection screen between main menu and gameplay."""
+    """Level selection screen with level buttons, challenge modes, and navigation.
+    Manages level unlocking, star ratings, and time/step challenge modes.
+    """
 
     def __init__(
         self,
@@ -86,6 +110,14 @@ class LevelSelect:
         title_font: pygame.font.Font,
         button_font: pygame.font.Font,
     ) -> None:
+        """Initialize level selection screen with dimensions and UI assets.
+        
+        Args:
+            screen_width: Game window width
+            screen_height: Game window height
+            title_font: Font for screen title
+            button_font: Font for level/mode buttons
+        """
         self._screen_width = screen_width
         self._screen_height = screen_height
         self._title_font = title_font
@@ -112,7 +144,15 @@ class LevelSelect:
         size: tuple[int, int],
         use_alpha: bool = True,
     ) -> pygame.Surface | None:
-        """Load and scale an image. Return None if the asset is missing."""
+        """Load an image file and scale it to the target size.
+        
+        Args:
+            path: Image file path
+            size: Target (width, height)
+            use_alpha: Enable transparency if True
+        Returns:
+            Scaled Pygame surface, None on failure
+        """
         try:
             image = pygame.image.load(path)
             image = image.convert_alpha() if use_alpha else image.convert()
@@ -121,12 +161,17 @@ class LevelSelect:
             return None
 
     def _get_challenge_button_positions(self, level_index: int) -> dict[str, tuple[int, int]]:
-        """Return fixed proportional positions for Time and Step buttons on the path."""
+        """Get fixed screen positions for Time/Step challenge buttons per level.
+        
+        Args:
+            level_index: Index of the current level
+        Returns:
+            Dictionary with 'time' and 'step' button coordinates
+        """
         w = self._screen_width
         h = self._screen_height
         
-        # Mapping based on user requirements (proportional to screen size)
-        # Level 1 (index 0), Level 2 (index 1), etc.
+        # Predefined proportional positions for each level
         layouts = [
             {"time": (0.18, 0.505), "step": (0.25, 0.515)},  # Level 1
             {"time": (0.42, 0.537), "step": (0.49, 0.515)},  # Level 2
@@ -141,7 +186,7 @@ class LevelSelect:
                 "step": (int(w * layout["step"][0]), int(h * layout["step"][1]))
             }
         
-        # Fallback for levels beyond 4 (vertical offset from level button)
+        # Fallback position for extra levels
         pos = C.LEVEL_BUTTON_POSITIONS[level_index] if level_index < len(C.LEVEL_BUTTON_POSITIONS) else (0,0)
         return {
             "time": (pos[0] - 40, pos[1] + 80),
@@ -149,6 +194,11 @@ class LevelSelect:
         }
 
     def _layout(self, level_total: int) -> None:
+        """Create and position all level and challenge mode buttons.
+        
+        Args:
+            level_total: Total number of game levels
+        """
         self._level_buttons.clear()
 
         button_size = C.LEVEL_BUTTON_SIZE
@@ -160,7 +210,7 @@ class LevelSelect:
             if i < len(positions):
                 center_x, center_y = positions[i]
             else:
-                # Fallback positions if more levels are added later.
+                # Auto-position for additional levels
                 extra = i - len(positions)
                 center_x = 220 + (extra % 4) * 190
                 center_y = 520 + (extra // 4) * 110
@@ -171,7 +221,7 @@ class LevelSelect:
                 (i, Button(rect, f"Level {i + 1}", self._button_font))
             )
 
-            # Challenge buttons along the path using the new helper
+            # Create challenge mode buttons
             radius = 28
             chal_pos = self._get_challenge_button_positions(i)
             
@@ -198,7 +248,15 @@ class LevelSelect:
         color: tuple[int, int, int],
         center: tuple[int, int],
     ) -> None:
-        """Draw readable text on top of the light paw image."""
+        """Draw text with white shadow for better readability on backgrounds.
+        
+        Args:
+            surface: Draw target surface
+            text: Text to render
+            font: Text font
+            color: Main text color
+            center: Center coordinates for text
+        """
         shadow_surf = font.render(text, True, (255, 255, 255))
         shadow_rect = shadow_surf.get_rect(
             center=(center[0] + 2, center[1] + 2))
@@ -216,7 +274,15 @@ class LevelSelect:
         unlocked: bool,
         stars: int,
     ) -> None:
-        """Draw one paw-shaped level button without changing its click logic."""
+        """Draw a single level button with unlock status and star rating.
+        
+        Args:
+            surface: Draw target surface
+            btn: Button object
+            level_index: Level number
+            unlocked: True if level is playable
+            stars: Earned star count (0-3)
+        """
         if self._level_button_img is not None:
             surface.blit(self._level_button_img, btn.rect.topleft)
         else:
@@ -241,7 +307,7 @@ class LevelSelect:
             title_text = "LOCKED"
             text_color = (95, 95, 95)
 
-        # Put both lines on the larger lower part of the paw.
+        # Draw level text and star count
         self._draw_text_with_shadow(
             surface,
             title_text,
@@ -263,7 +329,12 @@ class LevelSelect:
             surface: pygame.Surface,
             mouse_pos: tuple[int, int] | None,
     ) -> None:
-        """Draw the Back button with an orange style."""
+        """Draw styled back button for navigation.
+        
+        Args:
+            surface: Draw target surface
+            mouse_pos: Mouse coordinates for hover effect
+        """
         if self._back_button is None:
             return
 
@@ -302,6 +373,16 @@ class LevelSelect:
         stars_by_level: dict[int, int],
         challenge_clears: dict[str, bool],
     ) -> None:
+        """Render full level selection screen with all UI elements.
+        
+        Args:
+            surface: Draw target surface
+            mouse_pos: Mouse coordinates
+            level_total: Total levels
+            unlocked_count: Number of unlocked levels
+            stars_by_level: Star rating per level
+            challenge_clears: Challenge mode completion status
+        """
         self._layout(level_total)
 
         if self._level_bg is not None:
@@ -309,6 +390,7 @@ class LevelSelect:
         else:
             surface.fill(C.COLOR_BG)
 
+        # Draw title with shadow
         title = self._title_font.render("Select Level", True, C.COLOR_TITLE)
         title_shadow = self._title_font.render(
             "Select Level", True, (82, 104, 64))
@@ -323,6 +405,7 @@ class LevelSelect:
         surface.blit(title_shadow, shadow_rect)
         surface.blit(title, title_rect)
 
+        # Draw all level buttons
         for i, btn in self._level_buttons:
             unlocked = i < unlocked_count
             stars = max(0, min(3, int(stars_by_level.get(i, 0))))
@@ -335,11 +418,11 @@ class LevelSelect:
                 stars,
             )
 
+        # Draw challenge mode buttons
         for level_index, mode_key, btn in self._mode_buttons:
             unlocked = level_index < unlocked_count
             stars = max(0, min(3, int(stars_by_level.get(level_index, 0))))
             if unlocked and stars == 3:
-                # 统一 key 格式: "level_index:MODE_STRING"
                 clear_key = f"{level_index}:{mode_key}"
                 is_cleared = bool(challenge_clears.get(clear_key, False))
                 btn.draw(surface, mouse_pos, cleared=is_cleared)
@@ -352,6 +435,16 @@ class LevelSelect:
         unlocked_count: int,
         stars_by_level: dict[int, int],
     ) -> str | tuple[str, int] | tuple[str, int, str] | None:
+        """Detect user interactions on the level select screen.
+        
+        Args:
+            pos: Click coordinates
+            unlocked_count: Unlocked level count
+            stars_by_level: Star ratings
+        Returns:
+            Interaction type and data (level, mode, back, locked)
+        """
+        # Check challenge mode buttons
         for level_index, mode_key, btn in self._mode_buttons:
             if btn.contains(pos):
                 unlocked = level_index < unlocked_count
@@ -360,6 +453,7 @@ class LevelSelect:
                     audio.play_click()
                     return ("mode", level_index, mode_key)
 
+        # Check level buttons
         for i, btn in self._level_buttons:
             if btn.contains(pos):
                 if i < unlocked_count:
@@ -367,6 +461,7 @@ class LevelSelect:
                     return ("level", i)
                 return "locked"
 
+        # Check back button
         if self._back_button is not None and self._back_button.contains(pos):
             audio.play_click()
             return "back"
@@ -375,7 +470,9 @@ class LevelSelect:
 
 
 class PausePanel:
-    """Pause overlay with Continue / Exit choices."""
+    """In-game pause menu overlay with continue and exit options.
+    Displays a semi-transparent overlay with control buttons.
+    """
 
     def __init__(
         self,
@@ -384,6 +481,14 @@ class PausePanel:
         title_font: pygame.font.Font,
         button_font: pygame.font.Font,
     ) -> None:
+        """Initialize pause menu panel.
+        
+        Args:
+            screen_width: Game window width
+            screen_height: Game window height
+            title_font: Pause title font
+            button_font: Button text font
+        """
         self._screen_width = screen_width
         self._screen_height = screen_height
         self._title_font = title_font
@@ -392,11 +497,11 @@ class PausePanel:
         self._layout()
 
     def _layout(self) -> None:
+        """Position and style pause menu buttons."""
         button_w = 200
         button_h = 50
         gap = 20
         x = (self._screen_width - button_w) // 2
-        # Center the button group vertically in the bottom 2/3 of the panel
         start_y = self._screen_height // 2 - 40
         specs = [
             ("continue", "Continue"),
@@ -413,31 +518,45 @@ class PausePanel:
             y += button_h + gap
 
     def draw(self, surface: pygame.Surface, mouse_pos: tuple[int, int] | None) -> None:
-        # 1. Draw semi-transparent overlay instead of filling black
+        """Render pause overlay and menu UI.
+        
+        Args:
+            surface: Draw target surface
+            mouse_pos: Mouse coordinates for hover effects
+        """
+        # Semi-transparent dark overlay
         overlay = pygame.Surface(
             (self._screen_width, self._screen_height), pygame.SRCALPHA)
-        overlay.fill((10, 14, 20, 160)) # Adjusted alpha for better background visibility
+        overlay.fill((10, 14, 20, 160))
         surface.blit(overlay, (0, 0))
 
-        # 2. Draw a panel background for the pause menu to make it stand out
+        # Central panel background
         panel_w = 400
         panel_h = 360
         panel_rect = pygame.Rect(0, 0, panel_w, panel_h)
         panel_rect.center = (self._screen_width // 2, self._screen_height // 2)
         
-        # Draw panel background with border
         pygame.draw.rect(surface, (120,177,124), panel_rect, border_radius=15)
         pygame.draw.rect(surface, C.COLOR_TITLE, panel_rect, width=4, border_radius=15)
 
+        # Pause title
         title = self._title_font.render("Paused", True, C.COLOR_WIN_TEXT)
         title_rect = title.get_rect(
             center=(self._screen_width // 2, panel_rect.top + 60))
         surface.blit(title, title_rect)
 
+        # Draw all buttons
         for btn in self._buttons.values():
             btn.draw(surface, mouse_pos)
 
     def action_at(self, pos: tuple[int, int]) -> str | None:
+        """Detect clicks on pause menu buttons.
+        
+        Args:
+            pos: Mouse click coordinates
+        Returns:
+            Button key (continue/save_exit/exit_no_save)
+        """
         for key, btn in self._buttons.items():
             if btn.contains(pos):
                 audio.play_click()

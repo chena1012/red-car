@@ -1,11 +1,12 @@
-"""Level data: hardcoded initial parameters for vehicles in each level."""
+"""Level data: hardcoded initial configurations for vehicles in each game level."""
 
 from __future__ import annotations
 
 from .state import GameState
 from .vehicle import Vehicle
 
-# Each level: list of dictionaries, keys match Vehicle.__init__
+# Hardcoded level definitions: list of levels, each level is a list of vehicle config dicts
+# Keys in each dict exactly match the parameters of Vehicle.__init__
 _LEVEL_SPECS: list[list[dict]] = [
     # Level 1
     [
@@ -101,13 +102,32 @@ _LEVEL_SPECS: list[list[dict]] = [
 
 
 def level_count() -> int:
+    """Get the total number of available game levels.
+    
+    Returns:
+        Total count of hardcoded levels
+    """
     return len(_LEVEL_SPECS)
 
 
 def make_vehicles(level_index: int) -> list[Vehicle]:
+    """Create a list of Vehicle objects for the specified level.
+    
+    Args:
+        level_index: Index of the level to generate vehicles for
+    Returns:
+        List of initialized Vehicle instances for the level
+    """
     idx = level_index % level_count()
     return [Vehicle(**spec) for spec in _LEVEL_SPECS[idx]]
 
 
 def load_game_state(level_index: int) -> GameState:
+    """Load the full initial GameState for the specified level.
+    
+    Args:
+        level_index: Index of the level to load
+    Returns:
+        GameState object with all vehicles for the level
+    """
     return GameState(make_vehicles(level_index))

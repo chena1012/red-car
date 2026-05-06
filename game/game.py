@@ -1,4 +1,4 @@
-"""Main game class: loop, level index, input events, drawing and victory prompts."""
+"""Main game class handling game loop, level management, input events, rendering, win/fail logic and save system."""
 
 from __future__ import annotations
 from game.audio import audio
@@ -27,27 +27,7 @@ audio.play_bgm()
 
 @dataclass
 class MoveAnimation:
-    vehicle_id: str
-    distance: int
-    elapsed_ms: int
-    duration_ms: int
-
-
-@dataclass(frozen=True)
-class WinStars:
-    clear: bool
-    time: bool
-    best_steps: bool
-
-    @property
-    def total(self) -> int:
-        return int(self.clear) + int(self.time) + int(self.best_steps)
-
-audio.play_bgm()
-
-
-@dataclass
-class MoveAnimation:
+    """Data class for vehicle movement animation state."""
     vehicle_id: str
     distance: int
     elapsed_ms: int
@@ -56,6 +36,7 @@ class MoveAnimation:
 
 @dataclass
 class ShakeAnimation:
+    """Data class for invalid move shake animation feedback."""
     vehicle_id: str
     dr: int
     dc: int
@@ -65,70 +46,98 @@ class ShakeAnimation:
 
 @dataclass
 class UndoState:
+    """Data class storing full game state for undo functionality."""
     vehicles_data: list[dict]
     steps: int
     remaining_steps: int
-    powerup_remain: int
-    total_powerup_used: int
+    remove_remain: int
+    total_remove_used: int
     total_removed_vehicles: int
+    remove_uses_this_level: int
 
 
 @dataclass(frozen=True)
 class WinStars:
+    """Immutable data class for level completion star rating system."""
     clear: bool
     time: bool
     best_steps: bool
 
     @property
     def total(self) -> int:
+        """Calculate total stars (0-3)."""
         return int(self.clear) + int(self.time) + int(self.best_steps)
 
 
 class Game:
+    """Core game class managing all game logic, UI, states and rendering."""
     def __init__(self) -> None:
+        # Audio instance
         self.audio = None
         pygame.init()
         pygame.display.set_caption("Pup Rescue: lawn block")
 
+        # Main display and game clock
         self._screen = pygame.display.set_mode(
             (C.WINDOW_WIDTH, C.WINDOW_HEIGHT))
         self._clock = pygame.time.Clock()
 
+        # Board position and instance
         self._board_x = C.BOARD_MARGIN
         self._board_y = C.TOP_SECTION_HEIGHT
         self._board = Board((self._board_x, self._board_y))
 
+        # Level and game state
         self._level_index = 0
         self._state: GameState = load_game_state(self._level_index)
 
+        # Vehicle selection and remove state
         self._selected_id: str | None = None
-        self._powerup_active = False
-        self._powerup_remain = 3
+        self._remove_active = False
+        self._remove_remain = 3
+        
+        # Game progress tracking
         self._steps = 0
         self._elapsed_ms = 0
         self._time_limit_ms = 0
         self._remaining_time_ms = 0
         self._step_limit = 0
         self._remaining_steps = 0
+        
+        # Game result flags
         self._won = False
         self._failed = False
+        
+        # Game mode and UI state
         self._mode = C.MODE_NORMAL
         self._state_name = "MENU"  # "MENU" or "LEVEL_SELECT" or "PLAYING" or "PAUSED"
+        
+        # Animation states
         self._move_anim: MoveAnimation | None = None
+        self._shake_anim: ShakeAnimation | None = None
+        
+        # Level progress tracking
         self._best_steps_by_level: dict[int, int] = {}
         self._best_stars_by_level: dict[int, int] = {}
         self._unlocked_levels = 1
+        
+        # Status message display
         self._status_text = ""
         self._status_ms_left = 0
+        
+        # Save and statistics
         self._save_manager = SaveManager()
-        self._total_powerup_used = 0
+        self._total_remove_used = 0
         self._total_removed_vehicles = 0
         self._challenge_clears: dict[str, bool] = {}
-        self._shake_anim: ShakeAnimation | None = None
+        
+        # Undo system
         self._undo_stack: list[UndoState] = []
+        self._remove_uses_this_level = 0
         self._load_game_metadata()
         self._state_name = "MENU"
 
+        # Font configurations for all UI elements
         self._font_title = pygame.font.Font(None, 50)
         self._font_title.set_bold(True)
         self._font_ui = pygame.font.Font(None, 18)
@@ -149,6 +158,7 @@ class Game:
         self._font_hud_value = pygame.font.Font(
             "C:/Windows/Fonts/consolab.ttf", 36)
 
+        # UI components
         self._control_bar = ControlBar(C.WINDOW_WIDTH, self._font_btn)
         self._menu = Menu(
             C.WINDOW_WIDTH, C.WINDOW_HEIGHT,
@@ -162,6 +172,7 @@ class Game:
         )
         self._result_buttons: dict[str, Button] = {}
 
+        # Background and UI image resources
         self._menu_bg = pygame.image.load(C.MENU_BG_PATH).convert()
         self._menu_bg = pygame.transform.smoothscale(
             self._menu_bg,
@@ -201,6 +212,7 @@ class Game:
             (C.INFO_BOX_WIDTH, C.INFO_BOX_HEIGHT)
         )
 
+        # Vehicle image resources and cache
         self._block_image_files: dict[int, list[str]
                                       ] = self._load_block_image_files()
         self._block_image_cache: dict[tuple[int, bool,
@@ -209,6 +221,7 @@ class Game:
         audio.play_bgm()
 
     def run(self) -> None:
+        """Main game loop: handle timing, events, updates and rendering."""
         running = True
         while running:
             dt = self._clock.tick(C.FPS)
@@ -223,10 +236,15 @@ class Game:
         sys.exit(0)
 
     def _load_level(self, index: int, mode: str = C.MODE_NORMAL) -> None:
-        """Switch to a level and reset steps, victory status and selection."""
+        """Switch to a level and reset steps, victory status and selection.
+        
+        Args:
+            index: Target level index to load
+            mode: Game mode to initialize
+        """
         self._mode = mode
         self._failed = False
-        audio.restart_bgm()  # 新关卡从头放BGM
+        audio.restart_bgm()
         audio.load_all_sfx()
         n = level_count()
         max_level = max(min(self._unlocked_levels, n) - 1, 0)
@@ -237,14 +255,15 @@ class Game:
         self._won = False
         self._selected_id = None
         self._move_anim = None
-        self._powerup_active = False
-        self._powerup_remain = 3
+        self.__remove_active = False
+        self._remove_remain = 3
         self._undo_stack.clear()
+        self._remove_uses_this_level = 0
         self._initialize_mode_limits()
 
     def _reset_current_level(self) -> None:
-        """Reset the current level layout."""
-        audio.restart_bgm()  # 新关卡从头放BGM
+        """Reset the current level to its initial state."""
+        audio.restart_bgm()
         audio.load_all_sfx()
         self._state = load_game_state(self._level_index)
         self._steps = 0
@@ -253,18 +272,31 @@ class Game:
         self._failed = False
         self._selected_id = None
         self._move_anim = None
-        self._powerup_active = False
-        self._powerup_remain = 3
+        self._remove_active = False
+        self._remove_remain = 3
         self._result_buttons.clear()
         self._undo_stack.clear()
+        self._remove_uses_this_level = 0
         self._initialize_mode_limits()
 
     def _set_status(self, text: str, duration_ms: int = 2200, color=C.COLOR_TITLE2) -> None:
+        """Display temporary status message on the screen.
+        
+        Args:
+            text: Message content to display
+            duration_ms: Display duration in milliseconds
+            color: Text color RGB tuple
+        """
         self._status_text = text
         self._status_ms_left = duration_ms
         self._status_color = color
 
     def _build_save_payload(self) -> dict:
+        """Construct complete save data dictionary.
+        
+        Returns:
+            Dictionary containing all game state for saving
+        """
         return {
             "level_index": self._level_index,
             "steps": self._steps,
@@ -278,7 +310,7 @@ class Game:
             "remaining_steps": self._remaining_steps,
             "unlocked_levels": self._unlocked_levels,
             "selected_id": self._selected_id,
-            "powerup_remain": self._powerup_remain,
+            "remove_remain": self._remove_remain,
             "vehicles": self._state.export_vehicles(),
             "best_steps_by_level": {
                 str(k): int(v) for k, v in self._best_steps_by_level.items()
@@ -286,13 +318,14 @@ class Game:
             "best_stars_by_level": {
                 str(k): int(v) for k, v in self._best_stars_by_level.items()
             },
-            "total_powerup_used": self._total_powerup_used,
+            "total_remove_used": self._total_remove_used,
             "total_removed_vehicles": self._total_removed_vehicles,
+            "remove_uses_this_level": self._remove_uses_this_level,
             "challenge_clears": dict(self._challenge_clears),
         }
 
     def _merge_challenge_clears_from_save(self) -> None:
-        """从磁盘读取旧存档并合并 challenge_clears，确保通关记录不丢失。"""
+        """Merge challenge completion records from save file to prevent data loss."""
         data, _ = self._save_manager.load()
         if not isinstance(data, dict):
             return
@@ -306,11 +339,15 @@ class Game:
                 self._challenge_clears[str(k)] = True
 
     def _save_game(self) -> bool:
+        """Save current game state to disk.
+        
+        Returns:
+            True if save succeeded, False otherwise
+        """
         if self._move_anim is not None:
             self._set_status("Cannot save during animation.")
             return False
 
-        # 保存前先从磁盘合并一次，防止多模式切换时内存数据覆盖了已有的磁盘记录
         self._merge_challenge_clears_from_save()
 
         ok, msg = self._save_manager.save(self._build_save_payload())
@@ -320,11 +357,14 @@ class Game:
         return ok
 
     def _save_metadata_only_preserving_progress(self) -> bool:
-        """保存全局进度（解锁关卡、最高分、挑战状态），但不覆盖已有的即时进度（如车辆位置等）。"""
+        """Save global progress without overwriting current level state.
+        
+        Returns:
+            True if save succeeded
+        """
         old_data, _ = self._save_manager.load()
         payload = old_data if isinstance(old_data, dict) else {}
 
-        # 合并挑战通关状态
         old_challenge = payload.get("challenge_clears", {})
         merged_challenge = {}
         if isinstance(old_challenge, dict):
@@ -332,12 +372,10 @@ class Game:
                 if bool(v):
                     merged_challenge[str(k)] = True
 
-        # 合并内存中的最新记录
         for k, v in self._challenge_clears.items():
             if bool(v):
                 merged_challenge[str(k)] = True
 
-        # 更新全局元数据
         payload.update({
             "unlocked_levels": self._unlocked_levels,
             "best_steps_by_level": {
@@ -346,7 +384,7 @@ class Game:
             "best_stars_by_level": {
                 str(k): int(v) for k, v in self._best_stars_by_level.items()
             },
-            "total_powerup_used": self._total_powerup_used,
+            "total_remove_used": self._total_remove_used,
             "total_removed_vehicles": self._total_removed_vehicles,
             "challenge_clears": merged_challenge,
         })
@@ -355,14 +393,18 @@ class Game:
         return ok
 
     def _save_without_progress(self) -> bool:
-        """保存元数据并明确清除当前关卡的即时进度存档。"""
+        """Save metadata and clear current level progress after victory.
+        
+        Returns:
+            True if save succeeded
+        """
         payload = self._build_save_payload()
         payload["level_index"] = -1
         ok, _ = self._save_manager.save(payload)
         return ok
 
     def _load_game_metadata(self) -> None:
-        """只加载全局元数据（如解锁进度、最高分），不加载具体关卡状态。"""
+        """Load global game metadata (unlocks, records, stats) only."""
         data, msg = self._save_manager.load()
         if data is None:
             return
@@ -371,7 +413,6 @@ class Game:
         self._unlocked_levels = max(
             1, min(int(data.get("unlocked_levels", 1)), n))
 
-        # 加载最高分和星星
         raw_best = data.get("best_steps_by_level", {})
         if isinstance(raw_best, dict):
             for k, v in raw_best.items():
@@ -386,11 +427,10 @@ class Game:
                 if 0 <= ik < n and 0 <= iv <= 3:
                     self._best_stars_by_level[ik] = iv
 
-        self._total_powerup_used = int(data.get("total_powerup_used", 0))
+        self._total_remove_used = int(data.get("total_remove_used", 0))
         self._total_removed_vehicles = int(
             data.get("total_removed_vehicles", 0))
 
-        # 加载挑战模式通关状态
         raw_challenge = data.get("challenge_clears", {})
         if isinstance(raw_challenge, dict):
             self._challenge_clears = {
@@ -400,6 +440,7 @@ class Game:
             self._challenge_clears = {}
 
     def _load_game(self) -> None:
+        """Load complete game state from save file."""
         if self._move_anim is not None:
             self._set_status("Cannot load during animation.")
             return
@@ -414,6 +455,13 @@ class Game:
         audio.play_click()
 
     def _apply_save_data(self, data: dict) -> bool:
+        """Apply loaded save data to game state.
+        
+        Args:
+            data: Save data dictionary
+        Returns:
+            True if data applied successfully
+        """
         n = level_count()
         try:
             unlocked = int(data.get("unlocked_levels", 1))
@@ -422,7 +470,6 @@ class Game:
             if level_idx < 0 or level_idx >= unlocked:
                 return False
 
-            # 如果有车辆数据，使用它创建状态，否则加载关卡
             if "vehicles" in data:
                 state = GameState([])
                 if not state.apply_vehicles(list(data["vehicles"])):
@@ -438,15 +485,26 @@ class Game:
             self._won = bool(data.get("won", False))
             self._failed = bool(data.get("failed", False))
 
+            if "vehicles" in data:
+                ref_state = load_game_state(level_idx)
+                inferred_removes = max(
+                    0, len(ref_state.vehicles) - len(self._state.vehicles)
+                )
+                self._remove_uses_this_level = max(
+                    inferred_removes,
+                    max(0, int(data.get("remove_uses_this_level", 0))),
+                )
+            else:
+                self._remove_uses_this_level = 0
+
             # Mode handling with validation
             mode = str(data.get("mode", C.MODE_NORMAL))
             if mode not in (C.MODE_NORMAL, C.MODE_LIMITED_TIME, C.MODE_LIMITED_STEP):
                 mode = C.MODE_NORMAL
             self._mode = mode
 
-            self._powerup_remain = max(0, int(data.get("powerup_remain", 3)))
+            self.__remove_active = max(0, int(data.get("remove_remain", 3)))
 
-            # Limits restoration: prefer saved values if they exist
             if "time_limit_ms" in data:
                 self._time_limit_ms = int(data["time_limit_ms"])
             if "remaining_time_ms" in data:
@@ -482,9 +540,8 @@ class Game:
                         parsed_stars[ik] = iv
             self._best_stars_by_level = parsed_stars
 
-            # 加载全局统计和挑战进度
-            self._total_powerup_used = int(
-                data.get("total_powerup_used", self._total_powerup_used))
+            self._total_remove_used = int(
+                data.get("total_remove_used", self._total_remove_used))
             self._total_removed_vehicles = int(
                 data.get("total_removed_vehicles", self._total_removed_vehicles))
             raw_challenge = data.get("challenge_clears", {})
@@ -500,25 +557,46 @@ class Game:
             return False
 
     def _time_star_limit_seconds(self, level_index: int) -> int:
-        # Harder levels get a bit more time budget.
-        level_seconds = [35, 45, 55, 70]
+        # Normal mode time ★: L1 <=1min, L2 <=2.5min, L3 <=6.5min, L4 <=10min.
+        level_seconds = [60, 150, 390, 600]
         if 0 <= level_index < len(level_seconds):
             return level_seconds[level_index]
-        return 70
+        return level_seconds[-1]
+
+    @staticmethod
+    def _format_time_budget_text(seconds: int) -> str:
+        if seconds <= 0:
+            return "0s"
+        m, s = divmod(seconds, 60)
+        if m == 0:
+            return f"{s}s"
+        if s == 0:
+            return f"{m}min"
+        return f"{m}min {s}s"
+
+    def _step_star_limit(self, level_index: int) -> int:
+        # Normal mode step ★: L1 <=6, L2 <=16, L3 <=40, L4 <=60.
+        limits = [6, 16, 40, 60]
+        if 0 <= level_index < len(limits):
+            return limits[level_index]
+        return limits[-1]
 
     def _limited_time_seconds(self, level_index: int) -> int:
-        limits = [30, 40, 50, 60]
+        # Time challenge (after 3★): 30s, 1min, 4min, 6min.
+        limits = [30, 60, 240, 360]
         if 0 <= level_index < len(limits):
             return limits[level_index]
-        return 60
+        return limits[-1]
 
     def _limited_step_count(self, level_index: int) -> int:
-        limits = [18, 24, 30, 36]
+        # Step challenge (after 3★): 4, 12, 33, 50 steps.
+        limits = [4, 12, 33, 50]
         if 0 <= level_index < len(limits):
             return limits[level_index]
-        return 36
+        return limits[-1]
 
     def _initialize_mode_limits(self) -> None:
+        """Initialize time/step limits based on current game mode."""
         if self._mode == C.MODE_LIMITED_TIME:
             self._time_limit_ms = self._limited_time_seconds(
                 self._level_index) * 1000
@@ -537,12 +615,28 @@ class Game:
             self._remaining_steps = 0
 
     def _challenge_time_limit_seconds(self, level_index: int) -> int:
+        """Get time limit for challenge mode.
+        
+        Args:
+            level_index: Current level index
+        Returns:
+            Time limit in seconds
+        """
         return self._limited_time_seconds(level_index)
 
     def _challenge_key(self, level_index: int, mode: str) -> str:
+        """Generate unique key for challenge completion tracking.
+        
+        Args:
+            level_index: Level index
+            mode: Game mode
+        Returns:
+            Formatted challenge key string
+        """
         return f"{level_index}:{mode}"
 
     def _mark_challenge_clear(self) -> None:
+        """Mark current challenge as completed and save progress."""
         if self._mode == C.MODE_NORMAL:
             return
         key = self._challenge_key(self._level_index, self._mode)
@@ -550,9 +644,21 @@ class Game:
         self._save_metadata_only_preserving_progress()
 
     def _challenge_step_limit(self, level_index: int) -> int:
+        """Get step limit for step challenge mode.
+        
+        Args:
+            level_index: Current level index
+        Returns:
+            Maximum allowed steps
+        """
         return self._limited_step_count(level_index)
 
     def _set_mode(self, mode: str) -> None:
+        """Set game mode and reset limits.
+        
+        Args:
+            mode: Target game mode
+        """
         if mode not in (C.MODE_NORMAL, C.MODE_LIMITED_TIME, C.MODE_LIMITED_STEP):
             mode = C.MODE_NORMAL
         self._mode = mode
@@ -560,21 +666,38 @@ class Game:
         self._initialize_mode_limits()
 
     def _is_new_best_steps(self) -> bool:
+        """Check if current steps are a new record for the level.
+        
+        Returns:
+            True if new best step count
+        """
         best = self._best_steps_by_level.get(self._level_index)
         if best is None:
             return True
         return self._steps <= best
 
     def _get_win_stars(self) -> WinStars:
+        """Calculate star rating for current level completion.
+        
+        Returns:
+            WinStars object with star status
+        """
         total_seconds = self._elapsed_ms // 1000
         time_limit = self._time_star_limit_seconds(self._level_index)
+        step_limit = self._step_star_limit(self._level_index)
+        clear = self._won
+        time_ok = total_seconds <= time_limit
+        step_ok = self._steps <= step_limit
+        if self._mode == C.MODE_NORMAL and self._remove_uses_this_level > 0:
+            return WinStars(clear=clear, time=False, best_steps=False)
         return WinStars(
-            clear=self._won,
-            time=total_seconds <= time_limit,
-            best_steps=self._is_new_best_steps(),
+            clear=clear,
+            time=time_ok,
+            best_steps=step_ok,
         )
 
     def _check_challenge_limits(self) -> None:
+        """Check if challenge mode limits (time/steps) are exceeded."""
         if self._state_name != "PLAYING" or self._won or self._failed or self._mode == C.MODE_NORMAL:
             return
 
@@ -593,37 +716,44 @@ class Game:
                 audio.play_fail()
 
     def _go_next_level(self) -> None:
+        """Navigate to the next unlocked level."""
         if self._level_index + 1 >= self._unlocked_levels:
             self._set_status("Next level is locked.")
             return
         self._load_level(self._level_index + 1)
 
     def _go_previous_level(self) -> None:
+        """Navigate to the previous level."""
         if self._level_index - 1 < 0:
             self._set_status("Already at the first level.")
             return
         self._load_level(self._level_index - 1)
 
     def _result_go_previous_level(self) -> None:
-        """从结果面板跳转到上一关，清理胜利/失败状态。"""
+        """Navigate to previous level from result screen."""
         self._won = False
         self._failed = False
         self._selected_id = None
         self._move_anim = None
-        self._powerup_active = False
+        self._remove_active = False
         self._go_previous_level()
 
     def _result_go_next_level(self) -> None:
-        """从结果面板跳转到下一关，清理胜利/失败状态。"""
+        """Navigate to next level from result screen."""
         self._won = False
         self._failed = False
         self._selected_id = None
         self._move_anim = None
-        self._powerup_active = False
+        self._remove_active = False
         self._go_next_level()
 
     def _try_restore_save_for(self, level_index: int, mode: str) -> None:
-        """尝试从存档中恢复特定关卡和模式的即时进度。"""
+        """Try to restore saved progress for specific level and mode.
+        
+        Args:
+            level_index: Target level index
+            mode: Target game mode
+        """
         data, _ = self._save_manager.load()
         if not data:
             return
@@ -638,6 +768,11 @@ class Game:
             self._apply_save_data(data)
 
     def _handle_events(self) -> bool:
+        """Process all Pygame input events.
+        
+        Returns:
+            True to continue game, False to quit
+        """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -679,7 +814,7 @@ class Game:
                         self._state_name = "LEVEL_SELECT"
                         self._selected_id = None
                         self._move_anim = None
-                        self._powerup_active = False
+                        self._remove_active = False
                 elif self._state_name == "PLAYING":
                     self._on_mouse_down(event.pos)
             elif event.type == pygame.KEYDOWN:
@@ -697,7 +832,7 @@ class Game:
         return True
 
     def _ensure_result_buttons(self) -> None:
-        """Ensure result overlay buttons exist before handling click events."""
+        """Initialize win/fail screen buttons if not created."""
         if self._result_buttons:
             return
 
@@ -739,6 +874,11 @@ class Game:
             )
 
     def _on_mouse_down(self, pos: tuple[int, int]) -> None:
+        """Handle mouse click input during gameplay.
+        
+        Args:
+            pos: Mouse click coordinates (x, y)
+        """
         if self._won or self._failed:
             self._ensure_result_buttons()
             for key, btn in self._result_buttons.items():
@@ -758,7 +898,6 @@ class Game:
                     elif key == "next":
                         self._result_go_next_level()
                     return
-            # 胜利或失败状态下，如果没点中面板按钮，直接拦截所有点击
             return
 
         action = self._control_bar.action_at(pos)
@@ -778,13 +917,13 @@ class Game:
             if not self._won:
                 self._state_name = "PAUSED"
             return
-        if action == "powerup":
-            if self._powerup_remain > 0:
-                if self._powerup_active:
-                    self._powerup_active = False
+        if action == "remove":
+            if self._remove_remain > 0:
+                if self._remove_active:
+                    self._remove_active = False
                     self._selected_id = None
                 else:
-                    self._powerup_active = True
+                    self._remove_active = True
                     self._selected_id = None
             return
         
@@ -793,7 +932,6 @@ class Game:
             self._set_status(hint, duration_ms=3000)
             audio.play_click()
 
-            # Automatically highlight the vehicle to be moved.
             if "Move " in hint:
                 parts = hint.split()
                 if len(parts) >= 3:
@@ -817,13 +955,14 @@ class Game:
         if self._move_anim is not None:
             return
 
-        if self._powerup_active and v is not None and not v.is_target:
-            self._push_undo() # Record the status before removing the vehicle
+        if self._remove_active and v is not None and not v.is_target:
+            self._push_undo()
             self._state.remove_vehicle(v.id)
-            self._powerup_active = False
-            self._powerup_remain -= 1   # Consume once
-            self._total_powerup_used += 1
+            self._remove_active = False
+            self._remove_remain -= 1
+            self._total_remove_used += 1
             self._total_removed_vehicles += 1
+            self._remove_uses_this_level += 1
             audio.play_remove()
             return
 
@@ -838,6 +977,11 @@ class Game:
         self._selected_id = v.id if v else None
 
     def _on_key_down(self, key: int) -> None:
+        """Handle keyboard input during gameplay.
+        
+        Args:
+            key: Pygame key constant
+        """
         if self._won or self._failed or self._selected_id is None or self._move_anim is not None:
             return
 
@@ -859,6 +1003,11 @@ class Game:
         self._start_move_animation(self._selected_id, dr, dc, max_steps=1)
 
     def _update(self, dt: int) -> None:
+        """Update game state every frame.
+        
+        Args:
+            dt: Delta time in milliseconds
+        """
         if self._status_ms_left > 0:
             self._status_ms_left = max(0, self._status_ms_left - dt)
             if self._status_ms_left == 0:
@@ -902,12 +1051,18 @@ class Game:
                     self._unlocked_levels = min(
                         level_count(), max(self._unlocked_levels, self._level_index + 2)
                     )
-                    self._save_without_progress()  # 胜利后保存元数据，不保留本关车辆位置
+                    self._save_without_progress()
                 else:
                     self._mark_challenge_clear()
                     self._set_status("Challenge completed!")
 
     def _try_click_move_to_cell(self, row: int, col: int) -> None:
+        """Attempt to move selected vehicle to target grid cell.
+        
+        Args:
+            row: Target cell row
+            col: Target cell column
+        """
         if self._selected_id is None:
             return
         v = self._state.get_vehicle(self._selected_id)
@@ -950,6 +1105,14 @@ class Game:
     def _start_move_animation(
         self, vehicle_id: str, dr: int, dc: int, max_steps: int | None = None
     ) -> None:
+        """Start vehicle movement animation with collision checking.
+        
+        Args:
+            vehicle_id: ID of vehicle to move
+            dr: Row direction (-1, 0, 1)
+            dc: Column direction (-1, 0, 1)
+            max_steps: Maximum steps to move
+        """
         if self._move_anim is not None:
             return
         if self._won or self._failed:
@@ -961,10 +1124,9 @@ class Game:
 
         dr_orig, dc_orig = dr, dc
 
-        # 方向锁定（完全正确）
         if v.horizontal:
-            dr = 0  # 横向车：只能左右
-            if dc_orig == 0 and dr_orig != 0: # 如果是横向车却尝试上下移动
+            dr = 0
+            if dc_orig == 0 and dr_orig != 0:
                 self._show_invalid_move(vehicle_id, dr_orig, dc_orig)
                 return
             dr = 0
@@ -984,14 +1146,12 @@ class Game:
             next_c = v.col + dc * (moved + 1)
             safe = True
 
-            # 先收集这辆车要移动到的所有格子
             cells = []
             for i in range(v.length):
                 r = next_r + (0 if v.horizontal else i)
                 c = next_c + (i if v.horizontal else 0)
                 cells.append((r, c))
 
-            # 检查边界
             for (r, c) in cells:
                 if r < 0 or r >= C.GRID_ROWS:
                     safe = False
@@ -1000,7 +1160,6 @@ class Game:
                 if c >= C.GRID_COLS and not (v.is_target and r == C.EXIT_ROW):
                     safe = False
 
-            # 检查碰撞（独立检查！不会卡左移！）
             if safe:
                 for other in self._state.vehicles:
                     if other.id == v.id:
@@ -1021,7 +1180,6 @@ class Game:
             self._show_invalid_move(vehicle_id, dr, dc)
             return
 
-        # 在执行合法移动前，记录撤销状态
         self._push_undo()
 
         steps = self._state.max_steps_in_direction(
@@ -1042,6 +1200,13 @@ class Game:
         )
 
     def _screen_pos_to_cell(self, pos: tuple[int, int]) -> tuple[int, int] | None:
+        """Convert screen coordinates to grid cell coordinates.
+        
+        Args:
+            pos: Screen (x, y) position
+        Returns:
+            (row, col) if valid, None otherwise
+        """
         x, y = pos
         x0, y0 = self._board.topleft
         if not (
@@ -1055,6 +1220,7 @@ class Game:
         return None
 
     def _draw_title(self) -> None:
+        """Render game title on top of screen."""
         text_surf = self._font_title.render(
             "Pup Rescue: lawn block", True, C.COLOR_TITLE2
         )
@@ -1064,7 +1230,7 @@ class Game:
         self._screen.blit(text_surf, text_rect)
 
     def _draw_hud(self) -> None:
-        # 1. Prepare Time Info
+        """Render HUD displaying time and step information."""
         if self._mode == C.MODE_LIMITED_TIME:
             total_seconds = self._remaining_time_ms // 1000
             time_label = "Time Left"
@@ -1076,7 +1242,6 @@ class Game:
         seconds = total_seconds % 60
         time_str = f"{minutes:02d}:{seconds:02d}"
 
-        # 2. Prepare Step Info
         if self._mode == C.MODE_LIMITED_STEP:
             step_label = "Steps Left"
             step_val_text = str(self._remaining_steps)
@@ -1084,14 +1249,11 @@ class Game:
             step_label = "Step"
             step_val_text = str(self._steps)
 
-        # 3. Draw Boxes
         time_rect = pygame.Rect(C.TIME_BOX_RECT)
         step_rect = pygame.Rect(C.STEP_BOX_RECT)
 
-        # --- Draw Time Box ---
         self._screen.blit(self._info_box1_bg, time_rect.topleft)
 
-        # Draw Label(s)
         time_label_surf = self._font_hud_label.render(
             time_label, True, C.COLOR_TITLE2
         )
@@ -1100,17 +1262,14 @@ class Game:
         )
         self._screen.blit(time_label_surf, time_label_rect)
 
-        # Draw Value
         time_val_surf = self._font_hud_value.render(
             time_str, True, C.COLOR_TITLE1)
         time_val_rect = time_val_surf.get_rect(
             center=(time_rect.centerx + 30, time_rect.y + 75))
         self._screen.blit(time_val_surf, time_val_rect)
 
-        # --- Draw Step Box ---
         self._screen.blit(self._info_box2_bg, step_rect.topleft)
 
-        # Draw Label(s)
         step_label_surf = self._font_hud_label.render(
             step_label, True, C.COLOR_TITLE2
         )
@@ -1119,7 +1278,6 @@ class Game:
         )
         self._screen.blit(step_label_surf, step_label_rect)
 
-        # Draw Value
         step_val_surf = self._font_hud_value.render(
             step_val_text, True, C.COLOR_TITLE1)
         step_val_rect = step_val_surf.get_rect(
@@ -1127,6 +1285,13 @@ class Game:
         self._screen.blit(step_val_surf, step_val_rect)
 
     def _show_invalid_move(self, vehicle_id: str | None = None, dr: int = 0, dc: int = 0) -> None:
+        """Play feedback for invalid vehicle movement.
+        
+        Args:
+            vehicle_id: ID of vehicle to shake
+            dr: Row shake direction
+            dc: Column shake direction
+        """
         audio.play_error()
         if vehicle_id is not None and self._move_anim is None:
             self._shake_anim = ShakeAnimation(
@@ -1138,22 +1303,22 @@ class Game:
             )
 
     def _push_undo(self) -> None:
-        """Record the current state to the undo stack."""
+        """Save current game state to undo stack."""
         state = UndoState(
             vehicles_data=self._state.export_vehicles(),
             steps=self._steps,
             remaining_steps=self._remaining_steps,
-            powerup_remain=self._powerup_remain,
-            total_powerup_used=self._total_powerup_used,
-            total_removed_vehicles=self._total_removed_vehicles
+            remove_remain=self._remove_remain,
+            total_remove_used=self._total_remove_used,
+            total_removed_vehicles=self._total_removed_vehicles,
+            remove_uses_this_level=self._remove_uses_this_level,
         )
         self._undo_stack.append(state)
-        # Limit the number of undo steps to prevent excessive memory usage (optional, for example, the last 50 steps)
         if len(self._undo_stack) > 50:
             self._undo_stack.pop(0)
 
     def _undo(self) -> None:
-        """Perform the undo operation."""
+        """Revert game state to last undo snapshot."""
         if not self._undo_stack or self._move_anim is not None or self._won or self._failed:
             return
 
@@ -1161,13 +1326,22 @@ class Game:
         self._state.apply_vehicles(state.vehicles_data)
         self._steps = state.steps
         self._remaining_steps = state.remaining_steps
-        self._powerup_remain = state.powerup_remain
-        self._total_powerup_used = state.total_powerup_used
+        self._remove_remain = state.remove_remain
+        self._total_remove_used = state.total_remove_used
         self._total_removed_vehicles = state.total_removed_vehicles
-        
+        self._remove_uses_this_level = state.remove_uses_this_level
+
         audio.play_undo()
 
     def _cell_rect_pixels(self, row: int, col: int) -> pygame.Rect:
+        """Get pixel rectangle for a grid cell.
+        
+        Args:
+            row: Cell row
+            col: Cell column
+        Returns:
+            Pygame Rect for the cell
+        """
         x0, y0 = self._board.topleft
         return pygame.Rect(
             x0 + col * C.CELL_SIZE,
@@ -1177,11 +1351,17 @@ class Game:
         )
 
     def _current_slide_offset(self, vehicle: Vehicle) -> tuple[float, float]:
+        """Calculate smooth movement offset for animation.
+        
+        Args:
+            vehicle: Target vehicle instance
+        Returns:
+            (x, y) offset tuple
+        """
         if self._move_anim is None or self._move_anim.vehicle_id != vehicle.id:
             return (0.0, 0.0)
 
         anim = self._move_anim
-        # Smoothstep easing gives responsive start/end without stutter.
         t = anim.elapsed_ms / anim.duration_ms
         eased = t * t * (3.0 - 2.0 * t)
         delta = anim.distance * C.CELL_SIZE * eased
@@ -1190,6 +1370,13 @@ class Game:
         return (0.0, delta)
 
     def _vehicle_draw_rect(self, vehicle: Vehicle) -> pygame.Rect:
+        """Get render rectangle for vehicle with animation offset.
+        
+        Args:
+            vehicle: Target vehicle instance
+        Returns:
+            Pygame Rect for rendering
+        """
         cells = vehicle.cells()
         rects = [self._cell_rect_pixels(r, c) for r, c in cells]
         union = rects[0].copy()
@@ -1202,6 +1389,7 @@ class Game:
         return body
 
     def _draw_exit_portal(self) -> None:
+        """Render level exit portal on game board."""
         x0, y0 = self._board.topleft
         portal_x = x0 + C.BOARD_PIXEL_W
         portal_y = y0 + C.EXIT_ROW * C.CELL_SIZE
@@ -1219,7 +1407,7 @@ class Game:
             self._screen, C.COLOR_EXIT_HIGHLIGHT, (tip, left, right))
 
     def _draw_board_frame(self) -> None:
-        """Draw decorative frame around the 6x6 board."""
+        """Render decorative frame around game board."""
         frame_x = self._board_x - C.BOARD_FRAME_PADDING
         frame_y = self._board_y - C.BOARD_FRAME_PADDING
 
@@ -1230,13 +1418,12 @@ class Game:
 
 
     def _draw_vehicles(self) -> None:
+        """Render all vehicles with animations and selection highlights."""
         for v in self._state.vehicles:
             body = self._vehicle_draw_rect(v)
 
-            # Apply shake offset if this vehicle is shaking
             if self._shake_anim is not None and self._shake_anim.vehicle_id == v.id:
                 progress = self._shake_anim.elapsed_ms / self._shake_anim.duration_ms
-                # sin(progress * pi * 3) gives a back-and-forth shake effect
                 offset = sin(progress * pi * 3) * 8
                 body.x += self._shake_anim.dc * offset
                 body.y += self._shake_anim.dr * offset
@@ -1244,7 +1431,6 @@ class Game:
             image = self._block_image_for_vehicle(v, body.size)
 
             if image is None:
-                # Fallback to the original color block if the image cannot be loaded.
                 pygame.draw.rect(self._screen, v.color, body, border_radius=8)
             else:
                 self._screen.blit(image, body.topleft)
@@ -1266,19 +1452,22 @@ class Game:
                     width=4,
                     border_radius=10,
                 )
-            if self._powerup_active:
-                # 小红车（目标车）不高亮，其他全部高亮
+            if self._remove_active:
                 if not v.is_target:
                     pygame.draw.rect(
                         self._screen,
-                        C.COLOR_POWERUP,
+                        C.COLOR_REMOVE,
                         body.inflate(10, 10),
                         width=5,
                         border_radius=10,
                     )
 
     def _load_block_image_files(self) -> dict[int, list[str]]:
-        """Load grass block images from the board_tiles folder automatically."""
+        """Load vehicle block images grouped by length.
+        
+        Returns:
+            Dictionary mapping vehicle length to image file list
+        """
         files_by_length = {
             2: [],
             3: [],
@@ -1297,11 +1486,9 @@ class Game:
             if not lower_name.endswith(valid_exts):
                 continue
 
-            # Reserve the target image for the red car only.
             if lower_name == C.TARGET_BLOCK_IMAGE.lower():
                 continue
 
-            # Filenames containing "_L" are used for 3-cell long blocks.
             if "_l" in lower_name:
                 files_by_length[3].append(filename)
             else:
@@ -1313,7 +1500,13 @@ class Game:
         return files_by_length
 
     def _block_image_name(self, vehicle: Vehicle) -> str:
-        """Choose a block image based on the vehicle type, length, and id."""
+        """Select image for vehicle based on length and ID.
+        
+        Args:
+            vehicle: Target vehicle instance
+        Returns:
+            Image filename string
+        """
         if vehicle.is_target:
             return C.TARGET_BLOCK_IMAGE
 
@@ -1330,7 +1523,14 @@ class Game:
             vehicle: Vehicle,
             size: tuple[int, int],
     ) -> pygame.Surface | None:
-        """Load, rotate, resize, and cache the grass block image."""
+        """Load and cache vehicle block image with rotation.
+        
+        Args:
+            vehicle: Target vehicle instance
+            size: Render size tuple (width, height)
+        Returns:
+            Pygame Surface or None if failed
+        """
         image_name = self._block_image_name(vehicle)
 
         if not image_name:
@@ -1348,8 +1548,6 @@ class Game:
 
         image = pygame.image.load(image_path).convert_alpha()
 
-        # The provided images are horizontal.
-        # Rotate the image automatically when the vehicle is vertical.
         if not vehicle.horizontal:
             image = pygame.transform.rotate(image, 90)
 
@@ -1359,14 +1557,12 @@ class Game:
         return image
 
     def _draw_win_overlay(self) -> None:
-        """Translucent layer covering board and HUD, keeping title and buttons clickable."""
-
+        """Render victory overlay with stats and stars."""
         w, h = self._screen.get_size()
         overlay = pygame.Surface((w, h), pygame.SRCALPHA)
         overlay.fill(C.COLOR_WIN_OVERLAY)
         self._screen.blit(overlay, (0, 0))
 
-        # Prepare stats text
         total_seconds = self._elapsed_ms // 1000
         minutes = total_seconds // 60
         seconds = total_seconds % 60
@@ -1375,7 +1571,6 @@ class Game:
         title_text = "YOU WIN!" if is_normal else "Challenge Completed!"
         line1 = self._font_win.render(title_text, True, C.COLOR_WIN_TEXT)
 
-        # Content surfaces list
         content_surfs = [line1]
 
         step_surf = None
@@ -1394,13 +1589,12 @@ class Game:
         if is_normal:
             stars = self._get_win_stars()
             time_limit = self._time_star_limit_seconds(self._level_index)
+            time_budget = self._format_time_budget_text(time_limit)
             time_target_surf = self._font_ui.render(
-                f"time target: <= {time_limit}s", True, C.COLOR_WIN_TEXT
+                f"time target: <= {time_budget}", True, C.COLOR_WIN_TEXT
             )
-            best_steps = self._best_steps_by_level.get(self._level_index)
-            best_steps_str = (
-                f"best step: {best_steps}" if best_steps is not None else "best step: -"
-            )
+            step_star_limit = self._step_star_limit(self._level_index)
+            best_steps_str = f"best step: <= {step_star_limit}"
             best_steps_surf = self._font_ui.render(
                 best_steps_str, True, C.COLOR_WIN_TEXT)
             score_surf = self._font_ui.render(
@@ -1431,7 +1625,6 @@ class Game:
                 ("exit", "Exit"),
             ]
 
-        # Calculate layout
         btn_w = 110
         btn_h = 40
         gap = 10
@@ -1440,23 +1633,22 @@ class Game:
         panel_content_width = max([s.get_width() for s in content_surfs] + [total_btns_w, 240])
         panel_w = panel_content_width + 80
 
-        # Calculate height based on content
-        panel_h = 24 + line1.get_height() + 20  # Top part
+        panel_h = 24 + line1.get_height() + 20
 
         if is_normal:
-            panel_h += 40 + 12  # Star row
+            panel_h += 40 + 12
             panel_h += step_surf.get_height() + 6 + time_surf.get_height() + 8
             panel_h += time_target_surf.get_height() + 8 + best_steps_surf.get_height() + \
                 8 + score_surf.get_height() + 14
             if line2:
                 panel_h += line2.get_height() + 14
         else:
-            panel_h += 20  # Small gap
+            panel_h += 20
             step_h = step_surf.get_height() if step_surf else 0
             time_h = time_surf.get_height() if time_surf else 0
             panel_h += step_h + 10 + time_h + 20
 
-        panel_h += btn_h + 30  # Buttons part
+        panel_h += btn_h + 30
 
         panel = pygame.Rect(0, 0, panel_w, panel_h)
         panel.center = (C.WINDOW_WIDTH // 2, C.WINDOW_HEIGHT // 2)
@@ -1515,9 +1707,11 @@ class Game:
                 self._screen.blit(time_surf, r_time)
                 y = r_time.bottom + 20
 
-        # Draw Buttons
         start_x = panel.centerx - total_btns_w // 2
-        y_btns = C.WINDOW_HEIGHT // 2 + 115
+        if self._mode == C.MODE_NORMAL:
+            y_btns = C.WINDOW_HEIGHT // 2 + 115
+        else:
+            y_btns = C.WINDOW_HEIGHT // 2 + 70
         
         if not self._result_buttons:
             for i, (key, label) in enumerate(button_specs):
@@ -1529,30 +1723,27 @@ class Game:
                 )
 
                 if key == "prev":
-                    self._result_buttons[key].set_colors((20,160,60),(20,160,60),(40,23,20),(1,2,0))   # 红色
+                    self._result_buttons[key].set_colors((20,160,60),(20,160,60),(40,23,20),(1,2,0))
                 elif key == "reset":
-                    self._result_buttons[key].set_colors((245,206,83),(245,206,83),(40,23,20),(1,2,0))   # 绿色
+                    self._result_buttons[key].set_colors((245,206,83),(245,206,83),(40,23,20),(1,2,0))
                 elif key == "next":
-                    self._result_buttons[key].set_colors((240,117,46),(240,117,46),(40,23,20),(1,2,0))   # 蓝色
+                    self._result_buttons[key].set_colors((240,117,46),(240,117,46),(40,23,20),(1,2,0))
                 elif key == "exit":
-                    self._result_buttons[key].set_colors((200, 200, 200),(200, 200, 200),(40,23,20),(1,2,0))   # 灰色
+                    self._result_buttons[key].set_colors((200, 200, 200),(200, 200, 200),(40,23,20),(1,2,0))
 
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
             btn.draw(self._screen, mouse)
 
     def _draw_fail_overlay(self) -> None:
-        """Translucent layer for failure state."""
-
+        """Render failure overlay for challenge mode."""
         w, h = self._screen.get_size()
         overlay = pygame.Surface((w, h), pygame.SRCALPHA)
         overlay.fill(C.COLOR_WIN_OVERLAY)
         self._screen.blit(overlay, (0, 0))
 
-        # Title
         line1 = self._font_win.render("You Fail!", True, C.COLOR_WIN_TEXT)
 
-        # Stats based on mode
         reason_str = ""
         stats_to_draw = []
 
@@ -1591,17 +1782,17 @@ class Game:
 
         panel_h = (
             line1.get_height()
-            + 24  # top margin
-            + 40  # star row space
-            + 12  # gap
+            + 24
+            + 40
+            + 12
             + stats_height
-            + (10 if stat_surfs else 0)  # gap after stats
+            + (10 if stat_surfs else 0)
             + reason_surf.get_height()
-            + 10  # gap
+            + 10
             + footer_surf.get_height()
-            + 20  # gap before buttons
-            + btn_h  # buttons
-            + 28  # bottom margin
+            + 20
+            + btn_h
+            + 28
         )
 
         panel = pygame.Rect(0, 0, panel_w, panel_h)
@@ -1615,7 +1806,6 @@ class Game:
         r1 = line1.get_rect(centerx=panel.centerx, top=y)
         self._screen.blit(line1, r1)
 
-        # Draw 0 stars
         self._draw_star_row(
             center_x=panel.centerx,
             top=r1.bottom + 12,
@@ -1635,9 +1825,8 @@ class Game:
             centerx=panel.centerx, top=r_reason.bottom + 10)
         self._screen.blit(footer_surf, r_footer)
 
-        # Draw Buttons
         start_x = panel.centerx - total_btns_w // 2
-        y_btns = C.WINDOW_HEIGHT // 2 + 70
+        y_btns = C.WINDOW_HEIGHT // 2 + 115
         
         if not self._result_buttons:
             for i, (key, label) in enumerate(button_specs):
@@ -1648,9 +1837,9 @@ class Game:
                     self._font_btn
                 )
                 if key == "exit":
-                    self._result_buttons[key].set_colors((20,160,60),(20,160,60),(40,23,20),(1,2,0))   # 红色
+                    self._result_buttons[key].set_colors((20,160,60),(20,160,60),(40,23,20),(1,2,0))
                 elif key == "reset":
-                    self._result_buttons[key].set_colors((245,206,83),(245,206,83),(40,23,20),(1,2,0))  
+                    self._result_buttons[key].set_colors((245,206,83),(245,206,83),(40,23,20),(1,2,0))
                 
         mouse = pygame.mouse.get_pos()
         for btn in self._result_buttons.values():
@@ -1659,6 +1848,13 @@ class Game:
     def _draw_star_row(
         self, center_x: int, top: int, stars_on: tuple[bool, bool, bool]
     ) -> None:
+        """Render star rating row.
+        
+        Args:
+            center_x: Center X coordinate
+            top: Top Y coordinate
+            stars_on: Tuple of star active states
+        """
         star_radius = 12
         spacing = 42
         start_x = center_x - spacing
@@ -1667,6 +1863,14 @@ class Game:
             self._draw_star(cx, top + 16, star_radius, is_on)
 
     def _draw_star(self, cx: int, cy: int, outer_radius: int, is_on: bool) -> None:
+        """Render single star icon.
+        
+        Args:
+            cx: Center X coordinate
+            cy: Center Y coordinate
+            outer_radius: Star outer radius
+            is_on: Star active state
+        """
         inner_radius = max(outer_radius * 0.45, 1.0)
         points: list[tuple[int, int]] = []
         for i in range(10):
@@ -1685,9 +1889,9 @@ class Game:
                 self._screen, C.COLOR_STAR_OFF_BORDER, points, 2)
 
     def _draw(self) -> None:
+        """Main rendering function for all game elements."""
         mouse = pygame.mouse.get_pos()
 
-        # 当弹出暂停、胜利或失败面板时，背景按钮（控制栏等）应当不响应鼠标悬停
         bg_mouse = mouse
         if self._state_name == "PAUSED" or self._won or self._failed:
             bg_mouse = None
@@ -1721,7 +1925,7 @@ class Game:
                 bg_mouse,
                 self._level_index,
                 level_count(),
-                self._powerup_remain
+                self._remove_remain
             )
 
         if self._state_name == "PAUSED":
